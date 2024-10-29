@@ -204,6 +204,8 @@ hyperion_serial_class_device_destroy( dev_t dev_num )
 }
 EXPORT_SYMBOL( hyperion_serial_class_device_destroy );
 
+static int chrdev_class = -1;
+
 //-------------------------------------------------------------------------------------------
 static int __init
 hyperion_generic_init( void )
@@ -211,13 +213,15 @@ hyperion_generic_init( void )
 {
     int i, result = 0;
     // printk( " %s\n", __FUNCTION__ );
-    int class = register_chrdev( 240, "hyperion_generic", &fops );
-    if( class != 0 )
+    chrdev_class = register_chrdev( 0, "hyperion_generic", &fops );
+    if( chrdev_class < 0 )
     {
         printk( KERN_ALERT "could not register hyperion_generic class: %d",
-                class );
+                chrdev_class );
         return -EIO;
     }
+
+    printk( "hyperion_generic: registered device class %d", chrdev_class );
 
     /* create sysfs class for hyperion */
     hyperion_class = class_create( "hyperion" );
@@ -227,7 +231,7 @@ hyperion_generic_init( void )
         result = PTR_ERR( hyperion_class );
         printk( " %s error %d\n", __FUNCTION__, result );
         class_destroy( hyperion_class );
-        unregister_chrdev( 240, "hyperion_generic" );
+        unregister_chrdev( chrdev_class, "hyperion_generic" );
         return result;
     }
 
@@ -246,7 +250,10 @@ hyperion_generic_exit( void )
 //-------------------------------------------------------------------------------------------
 {
     // printk( " %s\n", __FUNCTION__ );
-    unregister_chrdev( 240, "hyperion_generic" );
+    if( chrdev_class > 0 )
+    {
+        unregister_chrdev( chrdev_class, "hyperion_generic" );
+    }
     class_destroy( hyperion_class );
 }
 
