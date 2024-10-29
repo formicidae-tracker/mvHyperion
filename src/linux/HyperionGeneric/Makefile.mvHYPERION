@@ -1,0 +1,28 @@
+#! /bin/make
+#-------------------------------------------------------------------------
+.PHONY:    all install 
+
+#=========================================================================
+all:
+	@(                                                     \
+		if ! [ -e Makefile ];                          \
+		then                                          \
+			echo "configure...";          			 \
+			./configure || exit $$?;                 \
+		fi;                                           \
+	)                                                     \
+
+install:
+	@(                                                     \
+		if ! [ -e Makefile ];                          \
+		then                                          \
+			echo "configure...";          			 \
+			./configure || exit $$?;                 \
+		fi;                                           \
+		if [ -e Makefile ];                			 \
+		then                                          \
+			echo "kernelmodule...";                    \
+			$(MAKE) --silent $@ || exit $$?;   				   \
+		fi;                                           \
+	)                                                     \
+#-------------------------------------------------------------------------

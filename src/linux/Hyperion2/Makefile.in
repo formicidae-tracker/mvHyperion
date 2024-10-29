@@ -1,0 +1,161 @@
+# Makefile.in - not created by automake!
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+VPATH = @srcdir@
+pkgdatadir = $(datadir)/@PACKAGE@
+pkglibdir = $(libdir)/@PACKAGE@
+pkgincludedir = $(includedir)/@PACKAGE@
+top_builddir = .
+
+AMTAR = ${SHELL} $(srcdir)/missing --run tar
+cross_compiling = @cross_compiling@
+KMODULES = @KMODULES@
+KERNEL_SOURCE = @KERNEL_SOURCE@
+KERNEL_OBJECT = @KERNEL_OBJECT@
+MAINTAINER_MODE=@MAINTAINER_MODE@
+LINUXVERSION=@LINUXVERSION@
+KERNEL_PATCH_LEVEL=@KERNEL_PATCH_LEVEL@
+MODULE_VERSION = @MODULE_VERSION@
+MODULE_VERSION_MAJOR = @MODULE_VERSION_MAJOR@
+MODULE_VERSION_MINOR = @MODULE_VERSION_MINOR@
+NUMERICAL_VERSION = @NUMERICAL_VERSION@
+KERNEL_MAJOR = @KERNEL_MAJOR@
+KERNEL_MINOR = @KERNEL_MINOR@
+KERNEL_BUILD = @KERNEL_BUILD@
+PACKAGE = @PACKAGE@
+#PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
+#PACKAGE_NAME = @PACKAGE_NAME@
+#PACKAGE_STRING = @PACKAGE_STRING@
+#PACKAGE_TARNAME = @PACKAGE_TARNAME@
+#PACKAGE_VERSION = @PACKAGE_VERSION@
+#PATH_SEPARATOR = @PATH_SEPARATOR@
+RH_KERNEL=@RH_KERNEL@
+SHELL = @SHELL@
+STRIP = @STRIP@
+DEPMOD = @DEPMOD@
+PKGVERSION = @VERSION@
+build = @build@
+build_alias = @build_alias@
+build_cpu = @build_cpu@
+build_os = @build_os@
+build_vendor = @build_vendor@
+host = @host@
+host_alias = @host_alias@
+host_cpu = @host_cpu@
+host_os = @host_os@
+host_vendor = @host_vendor@
+install_sh = @install_sh@
+prefix = @prefix@
+target = @target@
+target_alias = @target_alias@
+target_cpu = @target_cpu@
+target_os = @target_os@
+target_vendor = @target_vendor@
+
+
+MY_MODULE_NAME 	= hyperion2
+MY_MODULE_O	= $(MY_MODULE_NAME).o
+MY_MODULE_KO 	= $(MY_MODULE_NAME).ko
+
+ifeq ($(KERNEL_MAJOR),$(filter $(KERNEL_MAJOR),3 4 5))
+	MY_MODULE	= $(MY_MODULE_KO)
+else
+	ifeq ($(KERNEL_MAJOR).$(KERNEL_MINOR),2.6) 
+		MY_MODULE	= $(MY_MODULE_KO)
+	else
+		#error minimal kernelversion: 2.6.x !
+	endif
+endif
+
+KERNEL_MODULES_PATH = ../../
+HYPERION_GENERIC_PATH = ../HyperionGeneric
+INC_PATH  = -I$(obj)/../common -I$(obj)/../../common -I$(obj)/../../common/Hyperion -I$(obj)/../Hyperion -I$(obj)/../../../ -I$(obj)/../Hyperion -I$(obj)
+
+MY_OBJS			= 	drivermain.o \
+				$(KERNEL_MODULES_PATH)/linux/common/matrix_tools.o \
+				$(KERNEL_MODULES_PATH)/common/i2c_access.o \
+				$(KERNEL_MODULES_PATH)/common/ksemaphore.o \
+				$(KERNEL_MODULES_PATH)/common/spi_access.o \
+				$(KERNEL_MODULES_PATH)/common/Hyperion/PoCLControl.o \
+				$(KERNEL_MODULES_PATH)/common/Hyperion/external_boot.o \
+				$(KERNEL_MODULES_PATH)/common/Hyperion/uart_read_write.o \
+				$(KERNEL_MODULES_PATH)/linux/common/device_queue.o \
+				iocontrol.o \
+				user_buffer.o \
+				read_write.o \
+				hyperion_base.o \
+				dma_sg_list_buffer.o \
+				clf_func.o
+
+EXTRA_CFLAGS	+= -DMAJOR_VERSION=$(MODULE_VERSION_MAJOR) -DMINOR_VERSION=$(MODULE_VERSION_MINOR) -DDEBUG=1 $(INC_PATH) -DUSE_NEW_REMAP_PAGE_RANGE=1 -DUSE_ACCESS_OK -DHAVE_MSECS_TO_JIFFIES_EXTRA=1 -DNIOS_SUPPORTED_TRANSFER=1 -DREMOVE_REQUEST_BUFFER_MAPPING
+
+ifeq ($(RH_KERNEL),yes) 
+EXTRA_CFLAGS += -DRH_KERNEL
+MODFLAGS = -DMODULE
+# rhconfig.h must be included before modversions.h!
+MODFLAGS += -include $(KERNEL_SOURCE)/include/linux/rhconfig.h -include $(KERNEL_SOURCE)/include/linux/modversions.h
+endif
+
+##=================================================================
+ifneq ($(KERNELRELEASE),)
+
+obj-m			+= $(MY_MODULE_O)
+$(MY_MODULE_NAME)-objs	:= $(MY_OBJS)
+
+else
+OLD_MOD_DESTDIR	= misc
+MOD_DESTDIR		= kernel/misc
+PWD         	= $(shell pwd)
+
+ifeq ($(RH_KERNEL),yes) 
+modules $(MY_MODULE_NAME) $(MY_MODULE) default all:  message prebuild
+	$(MAKE) -C $(KERNEL_SOURCE) O=$(KERNEL_OBJECT) MODFLAGS="$(MODFLAGS)" SUBDIRS=$(PWD) modules
+else
+modules $(MY_MODULE_NAME) $(MY_MODULE) default all:  message prebuild
+	$(MAKE) -C $(KERNEL_SOURCE) O=$(KERNEL_OBJECT) SUBDIRS=$(PWD) modules
+endif
+
+message:
+	@(																		\
+		echo "**********************************************************";	\
+		echo " making MATRIX VISION kernel module $(MY_MODULE) for";		\
+		echo " kernel version $(LINUXVERSION)";								\
+		echo " If this is NOT correct enter ctrl-C NOW to stop! ";			\
+		echo "**********************************************************";	\
+		sleep 5;															\
+	)
+
+prebuild:
+	@(									\
+		echo "using the symbols from the hyperion_generic module";	\
+		rm -rf ./Module*.symvers;					\
+		cp $(HYPERION_GENERIC_PATH)/Module*.symvers .;			\
+	)
+
+$(KMODULES)/$(MOD_DESTDIR)/$(MY_MODULE): $(MY_MODULE)
+	@echo "kernel patch level is $(KERNEL_PATCH_LEVEL)"
+	$(STRIP) -g $(MY_MODULE)
+	rm -f $(KMODULES)/$(OLD_MOD_DESTDIR)/$(MY_MODULE)
+	@echo "Installing $(MY_MODULE) in $(KMODULES)/$(MOD_DESTDIR)"
+	mkdir -p $(KMODULES)/$(MOD_DESTDIR)
+	cp $(sort $(MY_MODULE)) $(KMODULES)/$(MOD_DESTDIR)
+	$(DEPMOD) -a $(LINUXVERSION)
+
+ifneq ($(cross_compiling),)
+install: modules $(KMODULES)/$(MOD_DESTDIR)/$(MY_MODULE)
+
+uninstall:
+	rm -r $(KMODULES)/$(MOD_DESTDIR)/$(MY_MODULE)
+else
+install modules_install:
+	@echo "** Cannot install modules when cross compiling!"
+
+uninstall modules_uninstall:
+	@echo "** Cannot uninstall modules when cross compiling!"
+endif
+
+clean:
+	rm -f $(MY_MODULE_KO) $(MY_MODULE_O) $(MY_OBJS) *.o *.ko *.mod.c .*.cmd .*flags .*.o.d $(KERNEL_MODULES_PATH)/.*flags $(KERNEL_MODULES_PATH)/.*.o.d
+
+endif
+

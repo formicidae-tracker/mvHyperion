@@ -1,0 +1,30 @@
+#! /bin/make
+SUB_DIRS= HyperionGeneric\
+	Hyperion\
+	Hyperion2\
+#-------------------------------------------------------------------------
+.PHONY: all install
+
+#=========================================================================
+all install:
+	@for sdir in $(SUB_DIRS);\
+	do\
+		echo $$sdir;\
+		(\
+			DRV_DIR=$$sdir;\
+			if [ -d $$DRV_DIR ];\
+			then\
+				if [ -e $$DRV_DIR/Makefile.mvHYPERION ];\
+				then\
+					echo "make in :"$$DRV_DIR;\
+					$(MAKE) -C $$DRV_DIR -f Makefile.mvHYPERION $@ || exit $$?;\
+				else\
+					echo "file not found : "$$DRV_DIR/Makefile.mvHYPERION;\
+				fi;\
+			else\
+				echo "directory not found : "$$DRV_DIR;\
+			fi\
+                )\
+        done
+
+#-------------------------------------------------------------------------
