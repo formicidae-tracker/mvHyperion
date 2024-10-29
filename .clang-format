@@ -1,0 +1,5 @@
+# -*- mode:yaml -*-
+---
+BasedOnStyle: GNU
+IndentWidth: 4
+---
