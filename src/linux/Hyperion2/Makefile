@@ -2,8 +2,12 @@ MODULE_VERSION ?= 2.47.2
 MODULE_VERSION_MAJOR ?= 2
 MODULE_VERSION_MINOR ?= 47
 
-COMMON_PATH=$(src)/../common
-COMMON_SYSTEM_PATH=$(src)/../../common
+COMMON_PATH=../common
+COMMON_SYSTEM_PATH=../../common
+
+KBUILD_EXTRA_SYMBOLS=$(M)/../HyperionGeneric/Module.symvers
+
+
 ifneq ($(KERNELRELEASE),)
 # kbuild part of makefile
 obj-m  := hyperion2.o
@@ -29,6 +33,9 @@ ccflags-y	:= -DMAJOR_VERSION=$(MODULE_VERSION_MAJOR) \
 	-DDEBUG=1 \
 	-I$(src)/../common \
 	-I$(src)/../../common \
+	-I$(src)/../../common/Hyperion \
+	-I$(src) \
+	-I$(src)/../Hyperion \
 	-DUSE_NEW_REMAP_PAGE_RANGE=1 \
 	-DUSE_ACCESS_OK \
 	-DHAVE_MSECS_TO_JIFFIES_EXTRA=1 \

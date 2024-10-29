@@ -86,7 +86,7 @@ int prepare_scatter_gather_list( struct hyperion_device* phyp_dev, struct hyperi
         {
             //PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
             address = sg_dma_address( &puser_buffer_descr->sg[index_sg_list_entry] ) & ~3;
-            if( dma_supported( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
+            if( dma_set_mask( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
             {
                 const u64 highPart = DMA_BIT_MASK( 32 ) << 32;
                 address |= ( address & highPart ) ? phyp_dev->address_space_encoding : 0;
@@ -112,7 +112,7 @@ int prepare_scatter_gather_list( struct hyperion_device* phyp_dev, struct hyperi
         {
             //PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
             address = sg_dma_address( &puser_buffer_descr->sg[index_sg_list_entry] ) & ~3;
-            if( dma_supported( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
+            if( dma_set_mask( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
             {
                 const u64 highPart = DMA_BIT_MASK( 32 ) << 32;
                 address |= ( address & highPart ) ? phyp_dev->address_space_encoding : 0;
@@ -736,14 +736,14 @@ int hyperion_func_init( struct hyperion* phyperion, unsigned long control )
     phyp_dev->sema_message_received = create_sema( 0, 1 );
     phyp_dev->pdev = phyperion->pdev;
     phyp_dev->address_space_encoding = DMA_ADDRESS_SPACE_ENCODING_32BIT;
-    if( !pci_set_dma_mask( phyperion->pdev, DMA_BIT_MASK( 64 ) ) )
+    if( !dma_set_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 64 ) ) )
     {
         phyp_dev->address_space_encoding = DMA_ADDRESS_SPACE_ENCODING_64BIT;
-        pci_set_consistent_dma_mask( phyperion->pdev, DMA_BIT_MASK( 64 ) );
+        dma_set_coherent_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 64 ) );
     }
-    else if( !pci_set_dma_mask( phyperion->pdev, DMA_BIT_MASK( 32 ) ) )
+    else if( !dma_set_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 32 ) ) )
     {
-        pci_set_consistent_dma_mask( phyperion->pdev, DMA_BIT_MASK( 32 ) );
+        dma_set_coherent_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 32 ) );
     }
     else
     {
@@ -1010,4 +1010,3 @@ void hyperion_func_camera_power( struct hyperion* phyperion, int state )
     }
 
 }
-
