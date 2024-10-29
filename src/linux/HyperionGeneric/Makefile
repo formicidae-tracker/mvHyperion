@@ -26,6 +26,8 @@ all:
 
 install:
 	$(MAKE) -C $(KDIR) M=$$PWD modules_install
+	depmod -A
+
 
 clean:
 	$(MAKE) -C $(KDIR) M=$$PWD clean
