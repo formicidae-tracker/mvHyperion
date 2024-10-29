@@ -191,7 +191,7 @@ static int __init hyperion_generic_init( void )
     if( register_chrdev( 240, "hyperion_generic", &fops ) == 0 )
     {
         /* create sysfs class for hyperion */
-        hyperion_class = class_create( THIS_MODULE, "hyperion" );
+        hyperion_class = class_create( "hyperion" );
         if( IS_ERR( hyperion_class ) && PTR_ERR( hyperion_class ) != -EEXIST )
         {
             /* tidy up after error */
@@ -225,4 +225,3 @@ static void __exit hyperion_generic_exit( void )
 module_init( hyperion_generic_init );
 module_exit( hyperion_generic_exit );
 MODULE_LICENSE( "GPL" );
-
