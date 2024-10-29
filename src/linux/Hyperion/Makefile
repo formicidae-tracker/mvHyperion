@@ -5,6 +5,9 @@ MODULE_VERSION_MINOR ?= 47
 COMMON_PATH=../common
 COMMON_SYSTEM_PATH=../../common
 
+
+KBUILD_EXTRA_SYMBOLS=$(M)/../HyperionGeneric/Module.symvers
+
 ifneq ($(KERNELRELEASE),)
 # kbuild part of makefile
 obj-m  := hyperion.o

@@ -132,8 +132,10 @@ void complete_request( volatile struct io_object* ioobj, unsigned char status )
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0)
         aio_complete( ioobj->iocb, ioobj->count, 0 );
-#else
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,16,0)
         ioobj->iocb->ki_complete( ioobj->iocb, ioobj->count, 0 );
+#else
+        ioobj->iocb->ki_complete( ioobj->iocb, ioobj->count);
 #endif
 
     }
@@ -1571,9 +1573,32 @@ static int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_p
 
     /* Try to fault in all of the necessary pages */
     //PRINTKM(MEM,(PKTD "sgl_map_user_pages() down_read(&current->mm->mmap_sem)\n", -1 ));
+#ifdef MMAP_LOCK_INITIALIZER
+    mmap_read_lock( current->mm );
+#else
     down_read( &current->mm->mmap_sem );
+#endif
     /* rw==READ means read from drive, write into memory area */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,5,0)
+    {
+        int locked = 1;
+        res = get_user_pages_remote( current->mm, uaddr, nr_pages, rw == READ ? FOLL_WRITE : 0, pages, &locked );
+        if( locked )
+        {
+            mmap_read_unlock( current->mm );
+        }
+    }
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,18,0)
+    {
+        int locked = 1;
+        res = get_user_pages_remote( uaddr, nr_pages, rw == READ ? FOLL_WRITE : 0, pages, NULL, &locked );
+        if( locked )
+        {
+            mmap_read_unlock( current->mm );
+        }
+    }
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
     {
         int locked = 1;
         res = get_user_pages_locked( uaddr, nr_pages, rw == READ ? FOLL_WRITE : 0, pages, &locked );
@@ -1763,13 +1788,13 @@ static int setup_buffering( struct kiocb* iocb, char __user* buf, size_t count, 
             for( i = 0; i < nr_pages; i++ )
             {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 24 )
-                addr = pci_map_page( device->pdev, sg_page( &sgl[i] ), 0, PAGE_SIZE, PCI_DMA_FROMDEVICE );
+                addr = dma_map_page( &device->pdev->dev, sg_page( &sgl[i] ), 0, PAGE_SIZE, DMA_FROM_DEVICE );
 #else
                 addr = pci_map_page( device->pdev, sgl[i].page, 0, PAGE_SIZE, PCI_DMA_FROMDEVICE );
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 27 )
-                map_result = pci_dma_mapping_error( device->pdev, addr );
+                map_result = dma_mapping_error( &device->pdev->dev, addr );
 #else
                 map_result = pci_dma_mapping_error( addr );
 #endif
@@ -2044,8 +2069,13 @@ ssize_t async_io_write( struct kiocb* iocb, const struct iovec* iocv, unsigned l
 ssize_t async_io_read( struct kiocb* iocb, struct iov_iter* iocv_iter )
 //-------------------------------------------------------------------------------------------
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+	const struct iovec * iov = iter_iov(iocv_iter);
+#else
+    const struct iovec * iov = iocv_iter->iov;
+#endif
     //  printk( " %s iov_base p%p iov_len %d count %d pos %d\n", __FUNCTION__, iocv->iov_base, (int)iocv->iov_len, (int)count, pos );
-    return async_read_write( iocb, ( char __user* )iocv_iter->iov->iov_base, iocv_iter->iov->iov_len, iocv_iter->iov_offset, TRUE );
+    return async_read_write( iocb, ( char __user* )iov->iov_base, iov->iov_len, iocv_iter->iov_offset, TRUE );
 }
 
 //-------------------------------------------------------------------------------------------
@@ -2101,4 +2131,3 @@ void abort_transfer( struct hyperion_device* device )
     }
     //PRINTKM(DMA,(PKTD " -%s %lu\n", device->index, __FUNCTION__, jiffies));
 }//abort_transfer
-
