@@ -156,7 +156,7 @@ void free_ubuf( struct hyperion_device* device, struct user_buffer_list* ubuf_ob
             for( i = 0; i < ubuf_obj->nr_pages; i++ )
             {
                 //printk(" %s pci_unmap_page( addr 0x%llx) index %d\n", __FUNCTION__,  sgl[i].dma_address, i );
-                pci_unmap_page( device->pdev, sgl[i].dma_address, PAGE_SIZE, PCI_DMA_FROMDEVICE );
+                dma_unmap_page( &device->pdev->dev, sgl[i].dma_address, PAGE_SIZE, DMA_FROM_DEVICE );
             }
             sgl_unmap_user_pages( ubuf_obj->sg, ubuf_obj->nr_pages, 0 );
             vfree( ubuf_obj->sg );

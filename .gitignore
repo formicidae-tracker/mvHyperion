@@ -6,3 +6,5 @@
 *.o
 modules.order
 *.mod.c
+/compile_commands.json
+/.cache/

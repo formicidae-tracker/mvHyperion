@@ -67,7 +67,7 @@
 //A  A  S  S  S  S  S  S  S  S  S  S  S  S  S  S  M  M  T  T  T  T  T  T  F  F  F  F  F  F  F  F
 #endif
 
-#include <kernelmodules/common/Hyperion/HyperionIoCtlCommon.h>
+#include <HyperionIoCtlCommon.h>
 
 //-----------------------------------------------------------------------------
 enum TFileAccess
@@ -137,5 +137,10 @@ typedef struct _ResultPacket
 #define IOCTL_WRITE_DMA_BUFFER_SIZE     CTL_CODE(FILE_DEVICE_HYPERION, 0x24, eMethodBuffered, eFileAnyAccess, __u32)
 #define IOCTL_SPI_READ_LEN              CTL_CODE(FILE_DEVICE_HYPERION, 0x25, eMethodBuffered, eFileAnyAccess, __u32)
 #define IOCTL_QUERY_CAPABILITIES        CTL_CODE(FILE_DEVICE_HYPERION, 0x26, eMethodBuffered, eFileAnyAccess, __u32)
+
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9,0)
+#define HAVE_UNLOCKED_IOCTL 1
+#endif
 
 #endif // HyperionIoCtlH

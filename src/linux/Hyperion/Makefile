@@ -2,8 +2,8 @@ MODULE_VERSION ?= 2.47.2
 MODULE_VERSION_MAJOR ?= 2
 MODULE_VERSION_MINOR ?= 47
 
-COMMON_PATH=$(src)/../common
-COMMON_SYSTEM_PATH=$(src)/../../common
+COMMON_PATH=../common
+COMMON_SYSTEM_PATH=../../common
 
 ifneq ($(KERNELRELEASE),)
 # kbuild part of makefile
@@ -24,7 +24,9 @@ ccflags-y	:= -DMAJOR_VERSION=$(MODULE_VERSION_MAJOR) \
 	-DMINOR_VERSION=$(MODULE_VERSION_MINOR) \
 	-DDEBUG=1 \
 	-I$(src)/../common \
-	-include $(src)/../common/mv_kconfig.h \
+	-I$(src)/../../common \
+	-I$(src)/../../common/Hyperion \
+	-I$(src) \
 	-DUSE_NEW_REMAP_PAGE_RANGE=1 \
 	-DUSE_ACCESS_OK \
 	-DHAVE_MSECS_TO_JIFFIES_EXTRA=1 \
