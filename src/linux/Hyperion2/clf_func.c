@@ -15,13 +15,13 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drivermain.h"
-#include "hyperion_base.h"
 #include "clf_func.h"
 #include "dma_sg_list_buffer.h"
+#include "drivermain.h"
+#include "hyperion_base.h"
+#include "utils.h"
 
-static HYPERION_BASE_REGISTER_DEF CLeRegisterBaseA32[ebrhMax] =
-{
+static HYPERION_BASE_REGISTER_DEF CLeRegisterBaseA32[ebrhMax] = {
 #include "hyperion_register_a32.h"
 };
 
@@ -863,19 +863,23 @@ int hyperion_func_enable_interrupt( struct hyperion* phyperion )
 }
 
 //-------------------------------------------------------------------------------------------
-int query_processor_system_infos( struct hyperion_device* phyp_dev )
+int
+query_processor_system_infos( struct hyperion_device *phyp_dev )
 //-------------------------------------------------------------------------------------------
 {
     int result = 0;
     unsigned long cpu_clk_hz, message = MESSAGE_TYPE_SYSTEM_INFO;
     message |= QUERY_CPU_CLK_HZ;
-    result = transmit_message( phyp_dev, message, 500, NULL, 0, &cpu_clk_hz );
+    result = transmit_message( phyp_dev, message, 1000, NULL, 0, &cpu_clk_hz );
     if( result < 0 || cpu_clk_hz == 0 )
     {
+        printk( KERN_ERR " %s fpga message error %s", __FUNCTION__,
+                strkerr( result ) );
         cpu_clk_hz = 100 * 1000000;
     }
     phyp_dev->processor_info.cpu_clk_hz = cpu_clk_hz;
-    printk( " %s  fpga processor cpuclk_hz %d status %x", __FUNCTION__, phyp_dev->processor_info.cpu_clk_hz, result );
+    printk( " %s  fpga processor cpuclk_hz %d status %x", __FUNCTION__,
+            phyp_dev->processor_info.cpu_clk_hz, result );
     return result;
 }
 
@@ -960,7 +964,6 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
     wait = msecs_to_jiffies( timeout_msec );
     /* while( wait > 0 ) */
     /* { */
-    /*     wait_jiffies( 1 ); */
     result = wait_sema( phyp_dev->sema_message_received, timeout_msec );
     /*     if( result == ObjSignaled ) */
     /*     { */

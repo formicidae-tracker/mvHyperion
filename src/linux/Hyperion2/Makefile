@@ -25,7 +25,8 @@ hyperion2-y := drivermain.o \
 	read_write.o \
 	hyperion_base.o \
 	dma_sg_list_buffer.o \
-	clf_func.o
+	clf_func.o \
+	utils.o
 
 
 ccflags-y	:= -DMAJOR_VERSION=$(MODULE_VERSION_MAJOR) \
