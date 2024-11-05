@@ -937,35 +937,47 @@ int hyperion_boot_processor( struct hyperion_device* phyp_dev, void* apps, unsig
 }
 
 //-------------------------------------------------------------------------------------------
-int transmit_message( struct hyperion_device* phyp_dev, unsigned int message, unsigned int timeout_msec, void* buffer, unsigned int size, unsigned long* processor_result )
+int
+transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
+                  unsigned int timeout_msec, void *buffer, unsigned int size,
+                  unsigned long *processor_result )
 //-------------------------------------------------------------------------------------------
 {
     unsigned long irqflags;
     int wait, result = -ENODATA;
     spin_lock_irqsave( &phyp_dev->ioctl_lock.s_message, irqflags );
-    if( buffer != NULL && size > 0 && size <= SIZE_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS )
+    if( buffer != NULL && size > 0
+        && size <= SIZE_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS )
     {
-        memcpy( ( void* )( ( char* )phyp_dev->hyperion_base.base + ONCHIP_MEM_DATA_BASE + OFF_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS ), buffer, size );
+        memcpy( (void *)( (char *)phyp_dev->hyperion_base.base
+                          + ONCHIP_MEM_DATA_BASE
+                          + OFF_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS ),
+                buffer, size );
     }
     reset_sema( phyp_dev->sema_message_received );
-    IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhPCICore, OFF_P2A_MAILBOX0, message );
+    IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhPCICore,
+                 OFF_P2A_MAILBOX0, message );
     wait = msecs_to_jiffies( timeout_msec );
-    while( wait > 0 )
-    {
-        wait_jiffies( 1 );
-        result = wait_sema( phyp_dev->sema_message_received, 0 );
-        if( result == ObjSignaled )
-        {
-            break;
-        }
-        --wait;
-    }
+    /* while( wait > 0 ) */
+    /* { */
+    /*     wait_jiffies( 1 ); */
+    result = wait_sema( phyp_dev->sema_message_received, timeout_msec );
+    /*     if( result == ObjSignaled ) */
+    /*     { */
+    /*         break; */
+    /*     } */
+    /*     --wait; */
+    /* } */
     if( result == ObjSignaled )
     {
         if( processor_result != NULL )
         {
             *processor_result = _READ_MAILBOX( OFF_A2P_MAILBOX0 );
-            PRINTKM( IO, ( PKTD " %s result %x " " mailbox0 0x%lx" "\n", phyp_dev->number, __FUNCTION__, result, *processor_result ) );
+            PRINTKM( IO, ( PKTD " %s result %x "
+                                " mailbox0 0x%lx"
+                                "\n",
+                           phyp_dev->number, __FUNCTION__, result,
+                           *processor_result ) );
             result = 0;
         }
     }
