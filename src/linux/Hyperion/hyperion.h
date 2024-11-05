@@ -96,21 +96,29 @@ struct dma_transfer_object
 //-------------------------------------------------------------------------------------------
 {
     unsigned int init_done;
-    DMA_CONTROLLER* dma_controller_pci;     ///< the pci dma controller using a translationtable --> AvalonToPCITranslationTable
-    DMA_CONTROLLER* dma_controller_videoin[cfdCommandFifoMaxList];      ///< this dma controller transfers data from video in to internal ram
+    DMA_CONTROLLER *dma_controller_pci; ///< the pci dma controller using a
+                                        ///< translationtable -->
+                                        ///< AvalonToPCITranslationTable
+    DMA_CONTROLLER *dma_controller_videoin
+        [cfdCommandFifoMaxList]; ///< this dma controller transfers data from
+                                 ///< video in to internal ram
 
-    //DMA Transfer hyperion to pci
-    long frame_counter;                     ///< framecounter will be reset only at startdevice
-    void* presult_proplist;                 ///< pointer to the result property list = image_footer
-    long requestID;                         ///< actual requestID, an important result property
-    struct device_queue* rw_queue;          ///< pointer to the read/write queue defined in the device extension
+    // DMA Transfer hyperion to pci
+    long frame_counter;     ///< framecounter will be reset only at startdevice
+    void *presult_proplist; ///< pointer to the result property list =
+                            ///< image_footer
+    long requestID;         ///< actual requestID, an important result property
+    struct device_queue *rw_queue; ///< pointer to the read/write queue defined
+                                   ///< in the device extension
 
-    wait_queue_head_t* presult_queue;       ///< pointer to our device result queue for handling parallel transfer results
+    wait_queue_head_t
+        *presult_queue; ///< pointer to our device result queue for handling
+                        ///< parallel transfer results
     u_long objid;
     struct memory_space avalon_to_pci_table;
     unsigned char muxdata_reset_required;
     struct mux_controller_sequence mux_seq;
-    volatile struct io_object* active_ioobj;
+    volatile struct io_object *active_ioobj;
     unsigned char rewrite_transfer_parameter;
     volatile unsigned char abort_all_transfer;
     volatile unsigned char abort_this_request;

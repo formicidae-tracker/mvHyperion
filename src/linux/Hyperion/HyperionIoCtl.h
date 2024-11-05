@@ -136,11 +136,8 @@ typedef struct _ResultPacket
 #define IOCTL_EEPROM_ACCESS             CTL_CODE(FILE_DEVICE_HYPERION, 0x23, eMethodBuffered, eFileAnyAccess, __u32)
 #define IOCTL_WRITE_DMA_BUFFER_SIZE     CTL_CODE(FILE_DEVICE_HYPERION, 0x24, eMethodBuffered, eFileAnyAccess, __u32)
 #define IOCTL_SPI_READ_LEN              CTL_CODE(FILE_DEVICE_HYPERION, 0x25, eMethodBuffered, eFileAnyAccess, __u32)
-#define IOCTL_QUERY_CAPABILITIES        CTL_CODE(FILE_DEVICE_HYPERION, 0x26, eMethodBuffered, eFileAnyAccess, __u32)
-
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9,0)
-#define HAVE_UNLOCKED_IOCTL 1
-#endif
+#define IOCTL_QUERY_CAPABILITIES                                              \
+    CTL_CODE( FILE_DEVICE_HYPERION, 0x26, eMethodBuffered, eFileAnyAccess,    \
+              __u32 )
 
 #endif // HyperionIoCtlH

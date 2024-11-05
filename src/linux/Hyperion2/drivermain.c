@@ -683,7 +683,8 @@ static int hyperion_remove_device( struct hyperion* phyperion )
 
 
 //-------------------------------------------------------------------------------------------
-static int __init hyperion_init( void )
+static int __init
+hyperion_init( void )
 //-------------------------------------------------------------------------------------------
 {
     int result = 0, device_number;
@@ -691,7 +692,8 @@ static int __init hyperion_init( void )
     unsigned int firstminor = 0;
 
     /*printk ( KERN_INFO "MATRIX Vision mvHYPERION2 - %d.%d.%d (%lx)\n",
-             HYPERION_MAJ_VERSION, HYPERION_MIN_VERSION, HYPERION_BUILD_NUMBER, debug );*/
+             HYPERION_MAJ_VERSION, HYPERION_MIN_VERSION, HYPERION_BUILD_NUMBER,
+       debug );*/
 
     if( major_dev_num )
     {
@@ -700,14 +702,16 @@ static int __init hyperion_init( void )
     }
     else
     {
-        result = alloc_chrdev_region( &dev_num, firstminor, MAX_CONT_DEVICES, "hyperion2" );
+        result = alloc_chrdev_region( &dev_num, firstminor, MAX_CONT_DEVICES,
+                                      "hyperion2" );
         major_dev_num = MAJOR( dev_num );
         minor_dev_num = MINOR( dev_num );
     }
 
     if( result < 0 )
     {
-        PRINTKM( MOD, ( "unable to get major %d for hyperion devices\n", major_dev_num ) );
+        PRINTKM( MOD, ( "unable to get major %d for hyperion devices\n",
+                        major_dev_num ) );
         return result;
     }
 
@@ -721,7 +725,64 @@ static int __init hyperion_init( void )
         init_pci();
     }
 
-    PRINTKM( MOD, ( "hyperion_init2() --> ok, %d Hyperions found.\n", hyperion_get_device_number() ) );
+#ifdef DEBUG
+    printk( KERN_INFO "IOCTL_QUERYINFO: 0x%08x\n", IOCTL_QUERYINFO );
+    printk( KERN_INFO "IOCTL_ABORTALLREQUESTS: 0x%08x\n",
+            IOCTL_ABORTALLREQUESTS );
+    printk( KERN_INFO "IOCTL_FLUSHPORT: 0x%08x\n", IOCTL_FLUSHPORT );
+    printk( KERN_INFO "IOCTL_GETNUMOFBYTESAVAIL: 0x%08x\n",
+            IOCTL_GETNUMOFBYTESAVAIL );
+    printk( KERN_INFO "IOCTL_SETBAUDRATE: 0x%08x\n", IOCTL_SETBAUDRATE );
+    printk( KERN_INFO "IOCTL_SERIALINIT: 0x%08x\n", IOCTL_SERIALINIT );
+    printk( KERN_INFO "IOCTL_SERIALCLOSE: 0x%08x\n", IOCTL_SERIALCLOSE );
+    printk( KERN_INFO "IOCTL_SERIALREAD: 0x%08x\n", IOCTL_SERIALREAD );
+    printk( KERN_INFO "IOCTL_SERIALWRITE: 0x%08x\n", IOCTL_SERIALWRITE );
+    printk( KERN_INFO "IOCTL_READRESULTPACKET: 0x%08x\n",
+            IOCTL_READRESULTPACKET );
+    printk( KERN_INFO "IOCTL_EMPTYREQUESTQUEUE: 0x%08x\n",
+            IOCTL_EMPTYREQUESTQUEUE );
+    printk( KERN_INFO "IOCTL_EMPTYRESULTQUEUE: 0x%08x\n",
+            IOCTL_EMPTYRESULTQUEUE );
+    printk( KERN_INFO "IOCTL_RESET_DMA_CONTROLLER: 0x%08x\n",
+            IOCTL_RESET_DMA_CONTROLLER );
+    printk( KERN_INFO "IOCTL_READ_EEPROM: 0x%08x\n", IOCTL_READ_EEPROM );
+    printk( KERN_INFO "IOCTL_WRITE_EEPROM: 0x%08x\n", IOCTL_WRITE_EEPROM );
+    printk( KERN_INFO "IOCTL_CONFIG_IO_BIT: 0x%08x\n", IOCTL_CONFIG_IO_BIT );
+    printk( KERN_INFO "IOCTL_WRITE_IO_BIT: 0x%08x\n", IOCTL_WRITE_IO_BIT );
+    printk( KERN_INFO "IOCTL_WRITE_MUX_DATA: 0x%08x\n", IOCTL_WRITE_MUX_DATA );
+    printk( KERN_INFO "IOCTL_CLEANUP_REQUEST_EXTENSION: 0x%08x\n",
+            IOCTL_CLEANUP_REQUEST_EXTENSION );
+    printk( KERN_INFO "IOCTL_READ_ASMI_U32: 0x%08x\n", IOCTL_READ_ASMI_U32 );
+    printk( KERN_INFO "IOCTL_WRITE_ASMI_U32: 0x%08x\n", IOCTL_WRITE_ASMI_U32 );
+    printk( KERN_INFO "IOCTL_WRITE_HRTC_U32: 0x%08x\n", IOCTL_WRITE_HRTC_U32 );
+    printk( KERN_INFO "IOCTL_RELOAD_DEVICE_INFORMATION: 0x%08x\n",
+            IOCTL_RELOAD_DEVICE_INFORMATION );
+    printk( KERN_INFO "IOCTL_READ_DIGITAL_INPUT: 0x%08x\n",
+            IOCTL_READ_DIGITAL_INPUT );
+    printk( KERN_INFO "IOCTL_WRITE_HRTC: 0x%08x\n", IOCTL_WRITE_HRTC );
+    printk( KERN_INFO "IOCTL_TRIGGER_SOFTWARE: 0x%08x\n",
+            IOCTL_TRIGGER_SOFTWARE );
+    printk( KERN_INFO "IOCTL_UNMAP_SG_LIST: 0x%08x\n", IOCTL_UNMAP_SG_LIST );
+    printk( KERN_INFO "IOCTL_BOOT_NIOS: 0x%08x\n", IOCTL_BOOT_NIOS );
+    printk( KERN_INFO "IOCTL_POWER_OVER_CL: 0x%08x\n", IOCTL_POWER_OVER_CL );
+    printk( KERN_INFO "IOCTL_I2C_READ_BYTE: 0x%08x\n", IOCTL_I2C_READ_BYTE );
+    printk( KERN_INFO "IOCTL_I2C_WRITE_BYTE: 0x%08x\n", IOCTL_I2C_WRITE_BYTE );
+    printk( KERN_INFO "IOCTL_SPI_READ: 0x%08x\n", IOCTL_SPI_READ );
+    printk( KERN_INFO "IOCTL_SPI_WRITE: 0x%08x\n", IOCTL_SPI_WRITE );
+    printk( KERN_INFO "IOCTL_READ_REGISTER_U32: 0x%08x\n",
+            IOCTL_READ_REGISTER_U32 );
+    printk( KERN_INFO "IOCTL_WRITE_REGISTER_U32: 0x%08x\n",
+            IOCTL_WRITE_REGISTER_U32 );
+    printk( KERN_INFO "IOCTL_EEPROM_ACCESS: 0x%08x\n", IOCTL_EEPROM_ACCESS );
+    printk( KERN_INFO "IOCTL_WRITE_DMA_BUFFER_SIZE: 0x%08x\n",
+            IOCTL_WRITE_DMA_BUFFER_SIZE );
+    printk( KERN_INFO "IOCTL_SPI_READ_LEN: 0x%08x\n", IOCTL_SPI_READ_LEN );
+    printk( KERN_INFO "IOCTL_QUERY_CAPABILITIES: 0x%08x\n",
+            IOCTL_QUERY_CAPABILITIES );
+#endif
+
+    PRINTKM( MOD, ( "hyperion_init2() --> ok, %d Hyperions found.\n",
+                    hyperion_get_device_number() ) );
     return 0;
 }
 
@@ -762,7 +823,8 @@ static struct pci_device_id hyperion_pci_tbl[] =
 MODULE_DEVICE_TABLE( pci, hyperion_pci_tbl );
 
 //-------------------------------------------------------------------------------------------
-int __init init_pci( void )
+int __init
+init_pci( void )
 //-------------------------------------------------------------------------------------------
 {
     memset( &hyperion_pci_driver, 0, sizeof( hyperion_pci_driver ) );

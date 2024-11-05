@@ -15,9 +15,9 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drivermain.h"
 #include "hyperion_base.h"
 #include "clf_func.h"
+#include "drivermain.h"
 
 #include "HyperionProp.h"
 #include "property.h"
@@ -28,8 +28,8 @@
 struct SItem
 //-------------------------------------------------------------------------------------------
 {
-    struct page* page;
-    void* vmem;
+    struct page *page;
+    void *vmem;
 };
 #endif
 

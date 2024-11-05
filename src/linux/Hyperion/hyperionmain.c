@@ -18,56 +18,57 @@
 #include <linux/version.h>
 
 #ifndef KERNEL_VERSION
-#define KERNEL_VERSION(a,b,c) (((a) << 16) | ((b) << 8) | (c))
+#define KERNEL_VERSION( a, b, c ) ( ( ( a ) << 16 ) | ( ( b ) << 8 ) | ( c ) )
 #endif
 
 // Use versioning if needed
-#if defined(CONFIG_MODVERSIONS) && ! defined(MODVERSIONS)
-#   define MODVERSIONS
+#if defined( CONFIG_MODVERSIONS ) && !defined( MODVERSIONS )
+#define MODVERSIONS
 #endif
 
-#include <linux/fs.h>
 #include <linux/ctype.h>
-#include <linux/types.h>
+#include <linux/fs.h>
+#include <linux/gfp.h>
+#include <linux/highmem.h>
+#include <linux/interrupt.h>
 #include <linux/kdev_t.h>
 #include <linux/module.h>
-#include <linux/gfp.h>
-#include <linux/interrupt.h>
 #include <linux/pci.h>
-#include <linux/highmem.h>
+#include <linux/types.h>
 #include <linux/vmalloc.h>
 
-#include "matrix_tools.h"       // <== this should be put in a common directory for all drivers!
 #include "ioctl_hyperion.h"
+#include "matrix_tools.h" // <== this should be put in a common directory for all drivers!
 
-#include "hyperion.h"
-#include "read_write.h"
+#include "DigitalIO.h"
 #include "HyperionIoCtl.h"
+#include "hyperion.h"
+#include "hyperion_generic.h"
 #include "i2c_access.h"
 #include "property.h"
-#include "DigitalIO.h"
-#include "hyperion_generic.h"
+#include "read_write.h"
 
 /* use following #define to use memory base mapping 1 */
-//#define USE_MEMBASE_1
+// #define USE_MEMBASE_1
 
 #define NO_MORE_HYPERIONS 1
 
 #if DEBUG
 #define MSG_DBG_BIT 16
-#define TM_DBG_BIT  17
-#define SLOT_DBG_BIT    18
+#define TM_DBG_BIT 17
+#define SLOT_DBG_BIT 18
 #define SEM_DBG_BIT 19
 /* from WA */
-#define MSGV_DBG_BIT    24  // verbose messages
-#define ENDIAN_DBG_BIT  25
+#define MSGV_DBG_BIT 24 // verbose messages
+#define ENDIAN_DBG_BIT 25
 
-#define IRQ_INITIALIZED BIT(31)
+#define IRQ_INITIALIZED BIT( 31 )
 
-unsigned long debug = 0 ; // BASE_SYS_DEBUG | _flg(TM) | _flg(SLOT) | _flg(SEM) ;
+unsigned long debug
+    = 0; // BASE_SYS_DEBUG | _flg(TM) | _flg(SLOT) | _flg(SEM) ;
 #endif
 
-static struct hyperion_device* hyperions[MAXHYPERIONS] = {NULL};
+static struct hyperion_device *hyperions[MAXHYPERIONS] = { NULL };
 static unsigned int irq_map_hyperion[MAXHYPERIONS] = {0, 0, 0, 0,
                                                       0, 0, 0, 0,
                                                       0, 0, 0, 0,
