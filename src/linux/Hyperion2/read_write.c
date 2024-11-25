@@ -139,7 +139,11 @@ sgl_map_user_pages( struct scatterlist *sgl, const unsigned int max_pages,
                                      &locked );
         if( locked )
         {
+#ifdef MMAP_LOCK_INITIALIZER
             mmap_read_unlock( current->mm );
+#else
+            up_read( &current->mm->mmap_sem );
+#endif
         }
     }
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION( 5, 18, 0 )
@@ -150,7 +154,11 @@ sgl_map_user_pages( struct scatterlist *sgl, const unsigned int max_pages,
                                      &locked );
         if( locked )
         {
+#ifdef MMAP_LOCK_INITIALIZER
             mmap_read_unlock( current->mm );
+#else
+            up_read( &current->mm->mmap_sem );
+#endif
         }
     }
 
@@ -161,13 +169,21 @@ sgl_map_user_pages( struct scatterlist *sgl, const unsigned int max_pages,
             uaddr, nr_pages, rw == READ ? FOLL_WRITE : 0, pages, &locked );
         if( locked )
         {
+#ifdef MMAP_LOCK_INITIALIZER
+            mmap_read_unlock( current->mm );
+#else
             up_read( &current->mm->mmap_sem );
+#endif
         }
     }
 #else
     res = get_user_pages( current, current->mm, uaddr, nr_pages, rw == READ, 0,
                           pages, NULL );
+#ifdef MMAP_LOCK_INITIALIZER
+    mmap_read_unlock( current->mm );
+#else
     up_read( &current->mm->mmap_sem );
+#endif
 #endif
     // PRINTKM(MEM,( "get_user_pages[_locked]() returns %d nr_pages %d \n",
     // res, nr_pages));
