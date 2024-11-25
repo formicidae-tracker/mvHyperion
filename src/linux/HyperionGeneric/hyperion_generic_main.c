@@ -183,15 +183,20 @@ void hyperion_serial_class_device_destroy( dev_t dev_num )
 EXPORT_SYMBOL( hyperion_serial_class_device_destroy );
 
 //-------------------------------------------------------------------------------------------
-static int __init hyperion_generic_init( void )
+static int __init
+hyperion_generic_init( void )
 //-------------------------------------------------------------------------------------------
 {
     int i, result = 0;
-    //printk( " %s\n", __FUNCTION__ );
+    // printk( " %s\n", __FUNCTION__ );
     if( register_chrdev( 240, "hyperion_generic", &fops ) == 0 )
     {
         /* create sysfs class for hyperion */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION( 6, 4, 0 )
+        hyperion_class = class_create( "hyperion" );
+#else
         hyperion_class = class_create( THIS_MODULE, "hyperion" );
+#endif
         if( IS_ERR( hyperion_class ) && PTR_ERR( hyperion_class ) != -EEXIST )
         {
             /* tidy up after error */
@@ -225,4 +230,3 @@ static void __exit hyperion_generic_exit( void )
 module_init( hyperion_generic_init );
 module_exit( hyperion_generic_exit );
 MODULE_LICENSE( "GPL" );
-
