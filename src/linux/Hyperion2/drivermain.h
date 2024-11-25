@@ -146,4 +146,8 @@ struct hyperion
 
 struct hyperion* get_hyperion( unsigned int index );
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION( 6, 0, 0 )
+int dma_supported( struct device *dev, u64 mask );
+#endif
+
 #endif //#define DriverMainH

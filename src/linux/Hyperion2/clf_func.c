@@ -15,13 +15,18 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drivermain.h"
-#include "hyperion_base.h"
 #include "clf_func.h"
 #include "dma_sg_list_buffer.h"
+#include "drivermain.h"
+#include "hyperion_base.h"
 
-static HYPERION_BASE_REGISTER_DEF CLeRegisterBaseA32[ebrhMax] =
+int
+dma_supported( struct device *dev, u64 mask )
 {
+    return dma_set_mask( dev, mask );
+}
+
+static HYPERION_BASE_REGISTER_DEF CLeRegisterBaseA32[ebrhMax] = {
 #include "hyperion_register_a32.h"
 };
 
@@ -65,44 +70,65 @@ void restart_trigger_hrtc( struct hyperion_device* phyp_dev, int restart, int hr
 }
 
 //-------------------------------------------------------------------------------------------
-int prepare_scatter_gather_list( struct hyperion_device* phyp_dev, struct hyperion_request_packet* phyperion_request_packet )
+int
+prepare_scatter_gather_list(
+    struct hyperion_device *phyp_dev,
+    struct hyperion_request_packet *phyperion_request_packet )
 //-------------------------------------------------------------------------------------------
 {
     volatile dma_addr_t address;
     int xfer, page_length;
-    struct dma_sg_list_entry* list_entry = ( struct dma_sg_list_entry* )phyperion_request_packet->dma_list_entry;
-    u64* psg_list_hyperion_dma_buffer = ( u64* )( list_entry->buf );
+    struct dma_sg_list_entry *list_entry
+        = (struct dma_sg_list_entry *)phyperion_request_packet->dma_list_entry;
+    u64 *psg_list_hyperion_dma_buffer = (u64 *)( list_entry->buf );
     unsigned long index_sg_list_entry = 0;
-    struct user_buffer_descriptor* puser_buffer_descr = &phyperion_request_packet->user_buffer_descr;
+    struct user_buffer_descriptor *puser_buffer_descr
+        = &phyperion_request_packet->user_buffer_descr;
 
-    xfer = ( int )phyperion_request_packet->parameters.transferlength;
-    //PRINTKM(DMA,(PKTD "prep_sg_list() dto p%p xfer 0x%x isg %u max_e %lu\n", phyp_dev->number, dto, xfer, itt ));
+    xfer = (int)phyperion_request_packet->parameters.transferlength;
+    // PRINTKM(DMA,(PKTD "prep_sg_list() dto p%p xfer 0x%x isg %u max_e %lu\n",
+    // phyp_dev->number, dto, xfer, itt ));
     xfer -= puser_buffer_descr->sg[0].offset;
-    //PRINTKM(DMA,(PKTD "xfer 0x%x offset 0x%x\n", phyp_dev->number, xfer, *offset ));
+    // PRINTKM(DMA,(PKTD "xfer 0x%x offset 0x%x\n", phyp_dev->number, xfer,
+    // *offset ));
 
     if( phyp_dev->pci_hyperion_page_size != PAGE_SIZE )
     {
         while( xfer > 0 && index_sg_list_entry < puser_buffer_descr->nr_pages )
         {
-            //PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
-            address = sg_dma_address( &puser_buffer_descr->sg[index_sg_list_entry] ) & ~3;
+            // PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer
+            // 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
+            address = sg_dma_address(
+                          &puser_buffer_descr->sg[index_sg_list_entry] )
+                      & ~3;
             if( dma_supported( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
             {
                 const u64 highPart = DMA_BIT_MASK( 32 ) << 32;
-                address |= ( address & highPart ) ? phyp_dev->address_space_encoding : 0;
+                address |= ( address & highPart )
+                               ? phyp_dev->address_space_encoding
+                               : 0;
             }
 
-            page_length = ( int )( puser_buffer_descr->sg[index_sg_list_entry].length );
+            page_length
+                = (int)( puser_buffer_descr->sg[index_sg_list_entry].length );
             while( page_length > 0 )
             {
-                *psg_list_hyperion_dma_buffer = cpu_to_le64( ( u64 )address );
-                //PRINTKM(DMA,(PKTD " %s: xfer 0x%x itranslationtable %d translationtable %p addr 0x%llx len 0x%x\n", phyp_dev->number, __FUNCTION__, xfer, itt, &translation_table[itt], address, page_length ));
-                //PRINTKM(DMA,(PKTD " %s: xfer 0x%x sg_list[%d] addr 0x%llx  0x%llx len 0x%x\n", phyp_dev->number, __FUNCTION__, xfer, index_sg_list_entry, *psg_list_hyperion_dma_buffer, address, sg_dma_len(&phyperion_request_packet->sg[index_sg_list_entry]) ));
+                *psg_list_hyperion_dma_buffer = cpu_to_le64( (u64)address );
+                // PRINTKM(DMA,(PKTD " %s: xfer 0x%x itranslationtable %d
+                // translationtable %p addr 0x%llx len 0x%x\n",
+                // phyp_dev->number, __FUNCTION__, xfer, itt,
+                // &translation_table[itt], address, page_length ));
+                // PRINTKM(DMA,(PKTD " %s: xfer 0x%x sg_list[%d] addr 0x%llx
+                // 0x%llx len 0x%x\n", phyp_dev->number, __FUNCTION__, xfer,
+                // index_sg_list_entry, *psg_list_hyperion_dma_buffer, address,
+                // sg_dma_len(&phyperion_request_packet->sg[index_sg_list_entry])
+                // ));
                 page_length -= phyp_dev->pci_hyperion_page_size;
                 address += phyp_dev->pci_hyperion_page_size;
                 ++psg_list_hyperion_dma_buffer;
             }
-            xfer -= ( int )( puser_buffer_descr->sg[index_sg_list_entry].length );
+            xfer
+                -= (int)( puser_buffer_descr->sg[index_sg_list_entry].length );
             ++index_sg_list_entry;
         }
     }
@@ -110,21 +136,32 @@ int prepare_scatter_gather_list( struct hyperion_device* phyp_dev, struct hyperi
     {
         while( xfer > 0 && index_sg_list_entry < puser_buffer_descr->nr_pages )
         {
-            //PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
-            address = sg_dma_address( &puser_buffer_descr->sg[index_sg_list_entry] ) & ~3;
+            // PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer
+            // 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
+            address = sg_dma_address(
+                          &puser_buffer_descr->sg[index_sg_list_entry] )
+                      & ~3;
             if( dma_supported( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
             {
                 const u64 highPart = DMA_BIT_MASK( 32 ) << 32;
-                address |= ( address & highPart ) ? phyp_dev->address_space_encoding : 0;
+                address |= ( address & highPart )
+                               ? phyp_dev->address_space_encoding
+                               : 0;
             }
-            *psg_list_hyperion_dma_buffer = cpu_to_le64( ( u64 )address );
-            //PRINTKM(DMA,(PKTD " %s: [%d] xfer 0x%x addr 0x%x len 0x%x\n", phyp_dev->number, __FUNCTION__, index_sg_list_entry, xfer, *psg_list_hyperion_dma_buffer, phyperion_request_packet->sg[index_sg_list_entry].length ));
-            xfer -= ( int )( puser_buffer_descr->sg[index_sg_list_entry].length );
+            *psg_list_hyperion_dma_buffer = cpu_to_le64( (u64)address );
+            // PRINTKM(DMA,(PKTD " %s: [%d] xfer 0x%x addr 0x%x len 0x%x\n",
+            // phyp_dev->number, __FUNCTION__, index_sg_list_entry, xfer,
+            // *psg_list_hyperion_dma_buffer,
+            // phyperion_request_packet->sg[index_sg_list_entry].length ));
+            xfer
+                -= (int)( puser_buffer_descr->sg[index_sg_list_entry].length );
             ++index_sg_list_entry;
             ++psg_list_hyperion_dma_buffer;
         }
     }
-    //PRINTKM(DMA,(PKTD " prepare_scatter_gather_list() page_off 0x%lx index_sg_list_entry %ld\n", phyp_dev->number, PAGE_SIZE + xfer, index_sg_list_entry ));
+    // PRINTKM(DMA,(PKTD " prepare_scatter_gather_list() page_off 0x%lx
+    // index_sg_list_entry %ld\n", phyp_dev->number, PAGE_SIZE + xfer,
+    // index_sg_list_entry ));
     return dcecNoError;
 }
 
@@ -713,12 +750,14 @@ void enable_enhanced_hardware_debugging( struct hyperion_device* phyp_dev )
     }
 }
 //-------------------------------------------------------------------------------------------
-int hyperion_func_init( struct hyperion* phyperion, unsigned long control )
+int
+hyperion_func_init( struct hyperion *phyperion, unsigned long control )
 //-------------------------------------------------------------------------------------------
 {
     int i, result = 0;
     u32 system_ctrl_reg;
-    struct hyperion_device* phyp_dev = kmalloc( sizeof( struct hyperion_device ), GFP_KERNEL );
+    struct hyperion_device *phyp_dev
+        = kmalloc( sizeof( struct hyperion_device ), GFP_KERNEL );
 
     PRINTKM( MOD, ( PKTD " >%s\n", phyperion->number, __FUNCTION__ ) );
     if( phyp_dev == NULL )
@@ -726,7 +765,7 @@ int hyperion_func_init( struct hyperion* phyperion, unsigned long control )
         return -ENOMEM;
     }
     memset( phyp_dev, 0, sizeof( struct hyperion_device ) );
-    phyperion->device = ( void* )phyp_dev;
+    phyperion->device = (void *)phyp_dev;
     phyp_dev->number = phyperion->number;
     spin_lock_init( &phyp_dev->ioctl_lock.s_message );
     spin_lock_init( &phyp_dev->ioctl_lock.s_tasklet );
@@ -736,18 +775,19 @@ int hyperion_func_init( struct hyperion* phyperion, unsigned long control )
     phyp_dev->sema_message_received = create_sema( 0, 1 );
     phyp_dev->pdev = phyperion->pdev;
     phyp_dev->address_space_encoding = DMA_ADDRESS_SPACE_ENCODING_32BIT;
-    if( !pci_set_dma_mask( phyperion->pdev, DMA_BIT_MASK( 64 ) ) )
+    if( !dma_set_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 64 ) ) )
     {
         phyp_dev->address_space_encoding = DMA_ADDRESS_SPACE_ENCODING_64BIT;
-        pci_set_consistent_dma_mask( phyperion->pdev, DMA_BIT_MASK( 64 ) );
+        dma_set_coherent_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 64 ) );
     }
-    else if( !pci_set_dma_mask( phyperion->pdev, DMA_BIT_MASK( 32 ) ) )
+    else if( !dma_set_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 32 ) ) )
     {
-        pci_set_consistent_dma_mask( phyperion->pdev, DMA_BIT_MASK( 32 ) );
+        dma_set_coherent_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 32 ) );
     }
     else
     {
-        printk( KERN_WARNING " %s: No suitable DMA available.\n", __FUNCTION__ );
+        printk( KERN_WARNING " %s: No suitable DMA available.\n",
+                __FUNCTION__ );
         return -1000;
     }
     result = init_sg_buffer_list( phyperion );
@@ -766,33 +806,46 @@ int hyperion_func_init( struct hyperion* phyperion, unsigned long control )
     switch( phyperion->vd_id.deviceId )
     {
     case PCI_DEVICE_ID_HYPERION_CL4E:
-        PRINTKM( MOD, ( PKTD " initialize PCI_DEVICE_ID_HYPERION_CL4E\n", phyperion->number ) );
+        PRINTKM( MOD, ( PKTD " initialize PCI_DEVICE_ID_HYPERION_CL4E\n",
+                        phyperion->number ) );
         phyp_dev->hyperion_base.base = phyperion->memory_base[2].base;
         phyp_dev->hyperion_base.size = phyperion->memory_base[2].size;
         phyp_dev->reg_def = CL4eRegisterBase;
         break;
     case PCI_DEVICE_ID_HYPERION_HDSDI_4X:
-        PRINTKM( MOD, ( PKTD " initialize PCI_DEVICE_ID_HYPERION_HDSDI_4X\n", phyperion->number ) );
+        PRINTKM( MOD, ( PKTD " initialize PCI_DEVICE_ID_HYPERION_HDSDI_4X\n",
+                        phyperion->number ) );
         phyp_dev->hyperion_base.base = phyperion->memory_base[2].base;
         phyp_dev->hyperion_base.size = phyperion->memory_base[2].size;
         phyp_dev->reg_def = HDSDI4eRegisterBase;
         break;
     default:
     case PCI_DEVICE_ID_HYPERION_CLE:
-        PRINTKM( MOD, ( PKTD " initialize PCI_DEVICE_ID_HYPERION_CLE\n", phyperion->number ) );
+        PRINTKM( MOD, ( PKTD " initialize PCI_DEVICE_ID_HYPERION_CLE\n",
+                        phyperion->number ) );
         phyp_dev->hyperion_base.base = phyperion->memory_base[0].base;
         phyp_dev->hyperion_base.size = phyperion->memory_base[0].size;
         phyp_dev->reg_def = CLeRegisterBaseA32;
         break;
     }
 
-    system_ctrl_reg = IO_READ_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhSystemRegister, OFF_SYSTEM_CONTROL );
-    phyp_dev->pci_hyperion_page_size = system_ctrl_reg & HYPERION_PCI_PAGE_SIZE_64K ? PAGE_SIZE_64K : PAGE_SIZE_4K;
-    PRINTKM( MOD, ( PKTD " hyperion page_size %d kB sys_ctrl 0x%x\n",  phyp_dev->number, phyp_dev->pci_hyperion_page_size / KB, system_ctrl_reg ) );
+    system_ctrl_reg = IO_READ_32( phyp_dev->hyperion_base, phyp_dev->reg_def,
+                                  ebrhSystemRegister, OFF_SYSTEM_CONTROL );
+    phyp_dev->pci_hyperion_page_size
+        = system_ctrl_reg & HYPERION_PCI_PAGE_SIZE_64K ? PAGE_SIZE_64K
+                                                       : PAGE_SIZE_4K;
+    PRINTKM( MOD, ( PKTD " hyperion page_size %d kB sys_ctrl 0x%x\n",
+                    phyp_dev->number, phyp_dev->pci_hyperion_page_size / KB,
+                    system_ctrl_reg ) );
 
-    if( IO_READ_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhSystemRegister, OFF_SYSTEM_VERSION ) == 0 )
+    if( IO_READ_32( phyp_dev->hyperion_base, phyp_dev->reg_def,
+                    ebrhSystemRegister, OFF_SYSTEM_VERSION )
+        == 0 )
     {
-        printk( "hyperion2 module" " %s default flash found, grabber functionality reduced to flashupdate\n", __FUNCTION__ );
+        printk( "hyperion2 module"
+                " %s default flash found, grabber functionality reduced to "
+                "flashupdate\n",
+                __FUNCTION__ );
         phyp_dev->user_flash_enabled = FALSE;
         return 0;
     }
@@ -805,10 +858,13 @@ int hyperion_func_init( struct hyperion* phyperion, unsigned long control )
     for( i = 0; i < MAX_PARALLEL_TRANSFER; i++ )
     {
         phyp_dev->pdma_object[i]->index = i;
-        SET_BIT( REG_POINTER( phyp_dev->hyperion_base, phyp_dev->reg_def, i + ebrhCLController0, OFF_MUX_CONTROLLER ), AOI_ENABLE, TRUE );
+        SET_BIT( REG_POINTER( phyp_dev->hyperion_base, phyp_dev->reg_def,
+                              i + ebrhCLController0, OFF_MUX_CONTROLLER ),
+                 AOI_ENABLE, TRUE );
         phyp_dev->pdma_object[i]->rw_queue = phyp_dev->pqueues[i];
         phyp_dev->pdma_object[i]->init_done = FALSE;
-        CreatePoCLObject( &phyp_dev->pocl[i], phyp_dev->hyperion_base.base, phyp_dev->reg_def, i + ebrhPoCLCtrl0 );
+        CreatePoCLObject( &phyp_dev->pocl[i], phyp_dev->hyperion_base.base,
+                          phyp_dev->reg_def, i + ebrhPoCLCtrl0 );
         if( control & _Ctrl( POCL ) )
         {
             PoCLChanged( &phyp_dev->pocl[i], TRUE );
@@ -820,16 +876,24 @@ int hyperion_func_init( struct hyperion* phyperion, unsigned long control )
     prepare_communication_buffer( phyp_dev );
     _PIPE_INITIALIZE( phyp_dev->interrupt_result_pipe, DMA_RESULT_QUEUE_LEN );
 
-    //this are our communication path to the fpga processor. The pipes initialized here are located in a shared buffer from fpga.
-    initialize_message_pipe( phyp_dev, &phyp_dev->request_message, OFF_ONCHIP_MEM_DATA_NIOS_MSG_HEADER, OFF_ONCHIP_MEM_DATA_NIOS_MSG_PIPE, SIZE_ONCHIP_MEM_DATA_NIOS_MSG_PIPE );
-    initialize_message_pipe( phyp_dev, &phyp_dev->request_result_message, OFF_ONCHIP_MEM_DATA_HOST_MSG_HEADER, OFF_ONCHIP_MEM_DATA_HOST_MSG_PIPE, SIZE_ONCHIP_MEM_DATA_HOST_MSG_PIPE );
-    hold_nios_in_reset( ( unsigned char* )phyp_dev->hyperion_base.base );
+    // this are our communication path to the fpga processor. The pipes
+    // initialized here are located in a shared buffer from fpga.
+    initialize_message_pipe( phyp_dev, &phyp_dev->request_message,
+                             OFF_ONCHIP_MEM_DATA_NIOS_MSG_HEADER,
+                             OFF_ONCHIP_MEM_DATA_NIOS_MSG_PIPE,
+                             SIZE_ONCHIP_MEM_DATA_NIOS_MSG_PIPE );
+    initialize_message_pipe( phyp_dev, &phyp_dev->request_result_message,
+                             OFF_ONCHIP_MEM_DATA_HOST_MSG_HEADER,
+                             OFF_ONCHIP_MEM_DATA_HOST_MSG_PIPE,
+                             SIZE_ONCHIP_MEM_DATA_HOST_MSG_PIPE );
+    hold_nios_in_reset( (unsigned char *)phyp_dev->hyperion_base.base );
     phyp_dev->processor_info.cpu_clk_hz = 100 * 1000000;
     phyp_dev->processor_status = cnerrNiosStopped;
     phyp_dev->processor_app_size = 0;
     phyp_dev->eeprom_write_access = -1;
     enable_enhanced_hardware_debugging( phyp_dev );
-    //PRINTKM(MOD,(PKTB " <%s --> irqlin %d\n", phyp_dev->number, __FUNCTION__, phyperion->irqlin));
+    // PRINTKM(MOD,(PKTB " <%s --> irqlin %d\n", phyp_dev->number,
+    // __FUNCTION__, phyperion->irqlin));
     PRINTKM( MOD, ( PKTD " <%s\n", phyperion->number, __FUNCTION__ ) );
     return result;
 }
@@ -1010,4 +1074,3 @@ void hyperion_func_camera_power( struct hyperion* phyperion, int state )
     }
 
 }
-
