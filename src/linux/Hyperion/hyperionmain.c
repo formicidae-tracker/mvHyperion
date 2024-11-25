@@ -1082,9 +1082,9 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
             break;
         }
         device->address_space_encoding = DMA_ADDRESS_SPACE_ENCODING_32BIT;
-        if( !dma_set_mask( &device->pdev->dev, DMA_BIT_MASK( 32 ) ) )
+        if( !pci_set_dma_mask( device->pdev, DMA_BIT_MASK( 32 ) ) )
         {
-            dma_set_coherent_mask( &device->pdev->dev, DMA_BIT_MASK( 32 ) );
+            pci_set_consistent_dma_mask( device->pdev, DMA_BIT_MASK( 32 ) );
         }
         else
         {
