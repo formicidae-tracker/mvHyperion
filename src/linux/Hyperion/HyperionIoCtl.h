@@ -2,13 +2,14 @@
 #ifndef HyperionIoCtlH
 #define HyperionIoCtlH HyperionIoCtlH
 //-----------------------------------------------------------------------------
-#include <linux/types.h>
 #include <linux/ioctl.h>
+#include <linux/types.h>
 
 #define DRIVER_NAME "/dev/hyperion"
-#define FILE_DEVICE_HYPERION ('h' & 0x3f)       // Linux 'type' restricted to 6 from 8 possible bits
+#define FILE_DEVICE_HYPERION                                                  \
+    ( 'h' & 0x3f ) // Linux 'type' restricted to 6 from 8 possible bits
 
-#define MINOR_SERIAL_PORT   64
+#define MINOR_SERIAL_PORT 64
 
 #define EEPROM_WRITE_ACCESS 0x2103
 
@@ -53,21 +54,25 @@
  *
  */
 
-//31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00
-//D  D  S  S  S  S  S  S  S  S  S  S  S  S  S  S  T  T  T  T  T  T  T  T  N  N  N  N  N  N  N  N
+// 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07
+// 06 05 04 03 02 01 00 D  D  S  S  S  S  S  S  S  S  S  S  S  S  S  S  T  T  T
+// T  T  T  T  T  N  N  N  N  N  N  N  N
 
-// 'DeviceType' is the bottom 6 bits of the Linux 'type' field (8 bits in total).
-// Note: we smuggle the 'Method' parameter into the top 2 bits of the Linux 'type' field.
-// 'Access' is the Linux 'dir' field (2 bits).
-// 'Function' is the Linux 'nr' field (only 8 bits!).
-#define CTL_CODE(DeviceType,Function,Method,Access,size)                    \
-    ((__u32)(_IOC((Access & 0x3),(DeviceType & 0x3f)|((Method & 0x3)<<6),(Function & 0xff),(sizeof(size) & 0x3fff))))
+// 'DeviceType' is the bottom 6 bits of the Linux 'type' field (8 bits in
+// total). Note: we smuggle the 'Method' parameter into the top 2 bits of the
+// Linux 'type' field. 'Access' is the Linux 'dir' field (2 bits). 'Function'
+// is the Linux 'nr' field (only 8 bits!).
+#define CTL_CODE( DeviceType, Function, Method, Access, size )                \
+    ( (__u32)( _IOC( ( Access & 0x3 ),                                        \
+                     ( DeviceType & 0x3f ) | ( ( Method & 0x3 ) << 6 ),       \
+                     ( Function & 0xff ), ( sizeof( size ) & 0x3fff ) ) ) )
 // ...and our definition results in this...
-//31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00
-//A  A  S  S  S  S  S  S  S  S  S  S  S  S  S  S  M  M  T  T  T  T  T  T  F  F  F  F  F  F  F  F
+// 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07
+// 06 05 04 03 02 01 00 A  A  S  S  S  S  S  S  S  S  S  S  S  S  S  S  M  M  T
+// T  T  T  T  T  F  F  F  F  F  F  F  F
 #endif
 
-#include <kernelmodules/common/Hyperion/HyperionIoCtlCommon.h>
+#include <Hyperion/HyperionIoCtlCommon.h>
 
 //-----------------------------------------------------------------------------
 enum TFileAccess

@@ -959,16 +959,19 @@ static void do_create_class_files_serial( struct hyperion_device* device, dev_t 
 
 //-------------------------------------------------------------------------------------------
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 3, 4, 0 )
-static int hyperion_init_one( struct pci_dev* pdev, const struct pci_device_id* ent )
+static int
+hyperion_init_one( struct pci_dev *pdev, const struct pci_device_id *ent )
 #else
-static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_device_id* ent )
+static int __devinit
+hyperion_init_one( struct pci_dev *pdev, const struct pci_device_id *ent )
 #endif
 //-------------------------------------------------------------------------------------------
 {
     int result, i, err;
     int device_index;
-    dev_t dev_num_serial[MAX_PARALLEL_TRANSFER] = {( dev_t )0, ( dev_t )0}, dev_num = ( dev_t )0;
-    struct hyperion_device* device;
+    dev_t dev_num_serial[MAX_PARALLEL_TRANSFER] = { (dev_t)0, (dev_t)0 },
+          dev_num = (dev_t)0;
+    struct hyperion_device *device;
 
     device_index = hyperion_get_device_number();
     if( device_index >= MAXHYPERIONS )
@@ -978,7 +981,9 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
 
     dev_num = MKDEV( major_dev_num, minor_dev_num + device_index );
 
-    if( ( device = ( struct hyperion_device* ) kzalloc( sizeof( struct hyperion_device ), GFP_KERNEL ) ) == NULL )
+    if( ( device = (struct hyperion_device *)kzalloc(
+              sizeof( struct hyperion_device ), GFP_KERNEL ) )
+        == NULL )
     {
         return -ENOMEM;
     }
@@ -991,28 +996,31 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
     /* Fail gracefully if need be */
     if( err )
     {
-        printk( PKET  "Error %d adding hyperion device%d", err, device_index );
+        printk( PKET "Error %d adding hyperion device%d", err, device_index );
         goto err2_out;
     }
 
     for( i = 0; i < MAX_PARALLEL_TRANSFER; i++ )
     {
         // register serial communication
-        dev_num_serial[i] = MKDEV( major_dev_num, minor_dev_num + device_index + ( ( i + 1 ) * MINOR_SERIAL_PORT ) );
+        dev_num_serial[i]
+            = MKDEV( major_dev_num, minor_dev_num + device_index
+                                        + ( ( i + 1 ) * MINOR_SERIAL_PORT ) );
         cdev_init( &device->cdev_serial[i], &hyperion_fops );
         device->cdev_serial[i].owner = THIS_MODULE;
         device->cdev_serial[i].ops = &hyperion_fops;
         err = cdev_add( &device->cdev_serial[i], dev_num_serial[i], 1 );
         if( err )
         {
-            printk( PKET  "Error %d adding hyperion_serial port %d", err, i );
+            printk( PKET "Error %d adding hyperion_serial port %d", err, i );
             goto err2_out;
         }
     }
 
     if( pci_enable_device( pdev ) )
     {
-        printk( PKET "hyperion %d: Cannot enable device at 0x%02x:0x%02x!\n", device_index, device->bus, PCI_SLOT( pdev->devfn ) );
+        printk( PKET "hyperion %d: Cannot enable device at 0x%02x:0x%02x!\n",
+                device_index, device->bus, PCI_SLOT( pdev->devfn ) );
         goto err2_out;
     }
 
@@ -1025,44 +1033,64 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
     /* get IRQ from PCI device - this also works with APIC */
     device->irqlin = pdev->irq;
 
-    space_get_memory_resource( pdev, device->s_lock, 0, &device->memory_base[0].physical_address, &device->memory_base[0].size );
-    device->memory_base[0].base = space_map( device->memory_base[0].physical_address, device->memory_base[0].size );
+    space_get_memory_resource( pdev, device->s_lock, 0,
+                               &device->memory_base[0].physical_address,
+                               &device->memory_base[0].size );
+    device->memory_base[0].base = space_map(
+        device->memory_base[0].physical_address, device->memory_base[0].size );
 
 #if MAP_MEMBASE_1
-    space_get_memory_resource( pdev, device->s_lock, 1, &device->memory_base[1].physical_address, &device->memory_base[1].size );
-    device->memory_base[1].base = space_map( device->memory_base[1].physical_address, device->memory_base[1].size );
+    space_get_memory_resource( pdev, device->s_lock, 1,
+                               &device->memory_base[1].physical_address,
+                               &device->memory_base[1].size );
+    device->memory_base[1].base = space_map(
+        device->memory_base[1].physical_address, device->memory_base[1].size );
 #endif /* USE_MEMBASE_1 */
 
-    PRINTKM( MOD, ( PKTD "hyperion resources got: register p%p addr 0x%lx size 0x%lx irq 0x%x\n",
-                    device->index, device->memory_base[0].base, device->memory_base[0].physical_address, device->memory_base[0].size, device->irqlin ) );
+    PRINTKM( MOD, ( PKTD "hyperion resources got: register p%p addr 0x%lx "
+                         "size 0x%lx irq 0x%x\n",
+                    device->index, device->memory_base[0].base,
+                    device->memory_base[0].physical_address,
+                    device->memory_base[0].size, device->irqlin ) );
 #if MAP_MEMBASE_1
-    PRINTKM( MOD, ( PKTD "hyperion resources got: ddrram p%p addr 0x%lx size 0x%lx\n",
-                    device->memory_base[1].base, device->memory_base[1].physical_address, device->memory_base[1].size ) );
+    PRINTKM(
+        MOD,
+        ( PKTD "hyperion resources got: ddrram p%p addr 0x%lx size 0x%lx\n",
+          device->memory_base[1].base, device->memory_base[1].physical_address,
+          device->memory_base[1].size ) );
 #endif /* USE_MEMBASE_1 */
 
-    space_get_memory_resource( pdev, device->s_lock, 2, &device->memory_base[2].physical_address, &device->memory_base[2].size );
-    device->memory_base[2].base = space_map( device->memory_base[2].physical_address, device->memory_base[2].size );
-    PRINTKM( MOD, ( PKTD "hyperion resources got: register p%p addr 0x%lx size 0x%lx irq 0x%x\n",
-                    device->index, device->memory_base[2].base, device->memory_base[2].physical_address, device->memory_base[2].size, device->irqlin ) );
+    space_get_memory_resource( pdev, device->s_lock, 2,
+                               &device->memory_base[2].physical_address,
+                               &device->memory_base[2].size );
+    device->memory_base[2].base = space_map(
+        device->memory_base[2].physical_address, device->memory_base[2].size );
+    PRINTKM( MOD, ( PKTD "hyperion resources got: register p%p addr 0x%lx "
+                         "size 0x%lx irq 0x%x\n",
+                    device->index, device->memory_base[2].base,
+                    device->memory_base[2].physical_address,
+                    device->memory_base[2].size, device->irqlin ) );
     pci_set_master( pdev );
     pci_read_config_word( pdev, PCI_VENDOR_ID, &device->vd_id.vendorId );
     pci_read_config_word( pdev, PCI_DEVICE_ID, &device->vd_id.deviceId );
 #if MAP_MEMBASE_1
     if( device->memory_base[1].base == NULL )
     {
-        printk( PKET  "Error: memory_base[1].base == NULL!\n" );
+        printk( PKET "Error: memory_base[1].base == NULL!\n" );
         goto err_out;
     }
 #endif /* USE_MEMBASE_1 */
 
-    if( ( irq_map_hyperion[device->index] ) == 0 ) /* If we don't already have this IRQ for this board */
+    if( ( irq_map_hyperion[device->index] )
+        == 0 ) /* If we don't already have this IRQ for this board */
     {
         for( i = 0; i < MAX_PARALLEL_TRANSFER; i++ )
         {
             device->pqueues[i] = &device->dq_read_write[i];
             device->pdma_object[i] = &device->dma_transfer_object[i];
             initialize_queue( device->pqueues[i], start_transfer, i );
-            //serialOK = CreateSerialCommunication( &device->UartPort[i], (PUCHAR)device->Register.UARTReg[i].UARTRead, i );
+            // serialOK = CreateSerialCommunication( &device->UartPort[i],
+            // (PUCHAR)device->Register.UARTReg[i].UARTRead, i );
             ///< todo check result queue and communication
         }
         device->pqueue_result = &device->dq_result;
@@ -1082,26 +1110,31 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
             break;
         }
         device->address_space_encoding = DMA_ADDRESS_SPACE_ENCODING_32BIT;
-        if( !pci_set_dma_mask( device->pdev, DMA_BIT_MASK( 32 ) ) )
+        if( !dma_set_mask( &device->pdev->dev, DMA_BIT_MASK( 32 ) ) )
         {
-            pci_set_consistent_dma_mask( device->pdev, DMA_BIT_MASK( 32 ) );
+            dma_set_coherent_mask( &device->pdev->dev, DMA_BIT_MASK( 32 ) );
         }
         else
         {
-            printk( KERN_WARNING " %s: No suitable DMA available.\n", __FUNCTION__ );
+            printk( KERN_WARNING " %s: No suitable DMA available.\n",
+                    __FUNCTION__ );
             result = -1000;
         }
         setup_read_write( device );
 
-        PRINTKM( MOD, ( PKTB "setup_read_write() --> irqlin %d\n", device->irqlin ) );
+        PRINTKM( MOD, ( PKTB "setup_read_write() --> irqlin %d\n",
+                        device->irqlin ) );
 
 #ifdef CONFIG_PCI_MSI
         if( pci_find_capability( device->pdev, PCI_CAP_ID_MSIX ) )
         {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 4, 8, 0 )
-            result = pci_enable_msix_range( device->pdev, device->msi_x_entry, HYPERION_MSI_X_MAX_VECTORS, HYPERION_MSI_X_MAX_VECTORS );
+            result = pci_enable_msix_range( device->pdev, device->msi_x_entry,
+                                            HYPERION_MSI_X_MAX_VECTORS,
+                                            HYPERION_MSI_X_MAX_VECTORS );
 #else
-            result = pci_enable_msix( device->pdev, device->msi_x_entry, HYPERION_MSI_X_MAX_VECTORS );
+            result = pci_enable_msix( device->pdev, device->msi_x_entry,
+                                      HYPERION_MSI_X_MAX_VECTORS );
 #endif
         }
         else
@@ -1114,13 +1147,15 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
         {
             PRINTKM( MOD, ( PKTB "device is  is using msi-x\n" ) );
             device->flags |= HYPERION_FLAG_MSIX;
-            //saa7160_drv->flags |= SAA7160_FLAG_MSIX;
+            // saa7160_drv->flags |= SAA7160_FLAG_MSIX;
             /* video interrupt */
-            /*result = request_irq( saa7160_drv->msi_x_entry[SAA7160_MSI_X_VECTOR_VIDEO].vector, saa7160_video_isr,
-                    IRQF_SHARED, saa7160_drv->name, (void *)saa7160_drv );
-            if( result < 0 ) {
-                dprintk( 0, "can't get device %d video IRQ %d\n", saa7160_num, saa7160_drv->msi_x_entry[SAA7160_MSI_X_VECTOR_VIDEO].vector );
-                goto fail;
+            /*result = request_irq(
+            saa7160_drv->msi_x_entry[SAA7160_MSI_X_VECTOR_VIDEO].vector,
+            saa7160_video_isr, IRQF_SHARED, saa7160_drv->name, (void
+            *)saa7160_drv ); if( result < 0 ) { dprintk( 0, "can't get device
+            %d video IRQ %d\n", saa7160_num,
+            saa7160_drv->msi_x_entry[SAA7160_MSI_X_VECTOR_VIDEO].vector ); goto
+            fail;
             } */
         }
         else
@@ -1142,47 +1177,59 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
             }
             else
             {
-                struct pci_bus* bus;
+                struct pci_bus *bus;
 
                 PRINTKM( MOD, ( PKTB "device is using int-x interrupts\n" ) );
-                PRINTKM( MOD, ( PKTB "hyperion_drv->no_msi = %d\n", device->pdev->no_msi ) );
+                PRINTKM( MOD, ( PKTB "hyperion_drv->no_msi = %d\n",
+                                device->pdev->no_msi ) );
                 for( bus = device->pdev->bus; bus; bus = bus->parent )
                     if( bus->bus_flags & PCI_BUS_FLAGS_NO_MSI )
                     {
-                        PRINTKM( MOD, ( PKTB "pci_enable_msi: bus cannot handle MSI\n" ) );
+                        PRINTKM(
+                            MOD,
+                            ( PKTB
+                              "pci_enable_msi: bus cannot handle MSI\n" ) );
                     }
             }
         }
 #endif /* CONFIG_PCI_MSI */
-#if LINUX_VERSION_CODE < KERNEL_VERSION (2,6,19)
-        if( ( ( device->flags & HYPERION_FLAG_MSIX )  == 0 ) && !request_irq( device->pdev->irq, hyperion_interrupt, SA_SHIRQ, intname[device->index], device ) )
+#if LINUX_VERSION_CODE < KERNEL_VERSION( 2, 6, 19 )
+        if( ( ( device->flags & HYPERION_FLAG_MSIX ) == 0 )
+            && !request_irq( device->pdev->irq, hyperion_interrupt, SA_SHIRQ,
+                             intname[device->index], device ) )
 #else
-        if( ( ( device->flags & HYPERION_FLAG_MSIX )  == 0 ) && !request_irq( device->pdev->irq, hyperion_interrupt, IRQF_SHARED, intname[device->index], device ) )
+        if( ( ( device->flags & HYPERION_FLAG_MSIX ) == 0 )
+            && !request_irq( device->pdev->irq, hyperion_interrupt,
+                             IRQF_SHARED, intname[device->index], device ) )
 #endif
         {
             if( device->flags & HYPERION_FLAG_MSI )
             {
-                IO_WRITE_32( device->hyperion_base, device->reg_def, ebrhPCICore, OFF_PCI_EXPRESS_INTERRUPT_ENABLE, AVL_IRQ );
+                IO_WRITE_32( device->hyperion_base, device->reg_def,
+                             ebrhPCICore, OFF_PCI_EXPRESS_INTERRUPT_ENABLE,
+                             AVL_IRQ );
             }
 
             device->flags |= HYPERION_FLAG_IRQ;
             irq_map_hyperion[device->index] = IRQ_INITIALIZED | device->irqlin;
-            PRINTKM( MOD, ( PKTB "%s() irq_map_hyperion 0x%x\n", __FUNCTION__, irq_map_hyperion[device->index] ) );
+            PRINTKM( MOD, ( PKTB "%s() irq_map_hyperion 0x%x\n", __FUNCTION__,
+                            irq_map_hyperion[device->index] ) );
             device->hyperion_tasklet.next = NULL;
             device->hyperion_tasklet.state = 0;
-            device->hyperion_tasklet.count.counter =  0;
+            device->hyperion_tasklet.count.counter = 0;
             device->hyperion_tasklet.data = device->index;
             device->hyperion_tasklet.func = hyperion_do_tasklet;
         }
         else
         {
-            printk( PKTD "request_irq ( %d ) * failed\n", device->index, device->irqlin );
+            printk( PKTD "request_irq ( %d ) * failed\n", device->index,
+                    device->irqlin );
             goto err_out;
         }
 
         /* This logic deliberately only makes one request_irq() call for
-        * each physical IRQ needed on each board. There is no need for more.
-        */
+         * each physical IRQ needed on each board. There is no need for more.
+         */
     }
     /* create class device */
     do_create_class_files( device, dev_num );
@@ -1190,7 +1237,7 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
     {
         do_create_class_files_serial( device, dev_num_serial[i] );
     }
-    device->flags |= HYPERION_FLAG_INITIALIZED ;
+    device->flags |= HYPERION_FLAG_INITIALIZED;
     init_completion( &device->compl_abort );
     /*  if( device->flags & HYPERION_FLAG_MSI )
         {
@@ -1198,12 +1245,18 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
             {
                 *(unsigned long*)(device->memory_base[2].base + 0x490) = 0x10;
                 *(unsigned long*)(device->memory_base[2].base + 0x690) = 0x10;
-                printk (KERN_INFO "%s try interrupts int_stat 0x%x\n", __FUNCTION__, ioread32( (void __iomem *)device->hyperion_base.PCIExpressInterruptStatus ) );
+                printk (KERN_INFO "%s try interrupts int_stat 0x%x\n",
+    __FUNCTION__, ioread32( (void __iomem
+    *)device->hyperion_base.PCIExpressInterruptStatus ) );
                 *(device->memory_base[2].base + 0x688) = 0x10;
-                printk (KERN_INFO "%s try interrupts int_stat 0x%x\n", __FUNCTION__, ioread32( (void __iomem *)device->hyperion_base.PCIExpressInterruptStatus ) );
+                printk (KERN_INFO "%s try interrupts int_stat 0x%x\n",
+    __FUNCTION__, ioread32( (void __iomem
+    *)device->hyperion_base.PCIExpressInterruptStatus ) );
     //          wait_jiffies( 2 );
                 *(device->memory_base[2].base + 0x488) = 0x10;
-                printk (KERN_INFO "%s try interrupts int_stat 0x%x\n", __FUNCTION__, ioread32( (void __iomem *)device->hyperion_base.PCIExpressInterruptStatus ) );
+                printk (KERN_INFO "%s try interrupts int_stat 0x%x\n",
+    __FUNCTION__, ioread32( (void __iomem
+    *)device->hyperion_base.PCIExpressInterruptStatus ) );
             }
         }*/
     device->eeprom_write_access = -1;
@@ -1211,13 +1264,14 @@ static int __devinit hyperion_init_one( struct pci_dev* pdev, const struct pci_d
 
 err_out:
     pci_disable_device( pdev );
-    space_unmap( ( void* )device->memory_base[0].base );
+    space_unmap( (void *)device->memory_base[0].base );
 #if MAP_MEMBASE_1
-    space_unmap( ( void* )device->memory_base[1].base );
+    space_unmap( (void *)device->memory_base[1].base );
 #endif /* USE_MEMBASE_1 */
 
 err2_out:
-    release_mem_region( pci_resource_start( pdev, 0 ), pci_resource_len( pdev, 0 ) );
+    release_mem_region( pci_resource_start( pdev, 0 ),
+                        pci_resource_len( pdev, 0 ) );
     kfree( device );
     hyperions[device_index] = NULL;
     printk( KERN_WARNING "mvHYPERION device %d *NOT* ok\n", device->index );

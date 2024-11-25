@@ -116,35 +116,40 @@ static TRANSLATION_TABLE_DEF_T translation_table_defs_trigger_64K[MAX_PARALLEL_T
 };
 
 //-------------------------------------------------------------------------------------------
-void complete_request( volatile struct io_object* ioobj, unsigned char status )
+void
+complete_request( volatile struct io_object *ioobj, unsigned char status )
 //-------------------------------------------------------------------------------------------
 {
     if( ioobj )
     {
-        PRINTKM( DMA, ( PKTD "%s ioobj %p\n", ioobj->device_index, __FUNCTION__, ioobj ) );
+        PRINTKM( DMA, ( PKTD "%s ioobj %p\n", ioobj->device_index,
+                        __FUNCTION__, ioobj ) );
         ///< todo answer with correct result
 #ifdef REMOVE_REQUEST_BUFFER_MAPPING
         {
-            struct hyperion_device* device = ( struct hyperion_device* )ioobj->iocb->ki_filp->private_data;
-            run_iocb( device->pqueue_result, ( struct io_object* )ioobj );
+            struct hyperion_device *device
+                = (struct hyperion_device *)ioobj->iocb->ki_filp->private_data;
+            run_iocb( device->pqueue_result, (struct io_object *)ioobj );
         }
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION( 4, 0, 0 )
         aio_complete( ioobj->iocb, ioobj->count, 0 );
-#else
+#elif LINUX_VERSION_CODE < KERNEL_VERSION( 5, 16, 0 )
         ioobj->iocb->ki_complete( ioobj->iocb, ioobj->count, 0 );
+#else
+        ioobj->iocb->ki_complete( ioobj->iocb, ioobj->count );
 #endif
-
     }
 }
 
 //-------------------------------------------------------------------------------------------
-void free_ubuf( struct hyperion_device* device, struct user_buffer_list* ubuf_obj )
+void
+free_ubuf( struct hyperion_device *device, struct user_buffer_list *ubuf_obj )
 //-------------------------------------------------------------------------------------------
 {
     int i;
-    struct scatterlist* sgl;
+    struct scatterlist *sgl;
     if( ubuf_obj != NULL )
     {
 #ifndef REMOVE_REQUEST_BUFFER_MAPPING
@@ -155,8 +160,10 @@ void free_ubuf( struct hyperion_device* device, struct user_buffer_list* ubuf_ob
             sgl = ubuf_obj->sg;
             for( i = 0; i < ubuf_obj->nr_pages; i++ )
             {
-                //printk(" %s pci_unmap_page( addr 0x%llx) index %d\n", __FUNCTION__,  sgl[i].dma_address, i );
-                pci_unmap_page( device->pdev, sgl[i].dma_address, PAGE_SIZE, PCI_DMA_FROMDEVICE );
+                // printk(" %s pci_unmap_page( addr 0x%llx) index %d\n",
+                // __FUNCTION__,  sgl[i].dma_address, i );
+                dma_unmap_page( &device->pdev->dev, sgl[i].dma_address,
+                                PAGE_SIZE, DMA_FROM_DEVICE );
             }
             sgl_unmap_user_pages( ubuf_obj->sg, ubuf_obj->nr_pages, 0 );
             vfree( ubuf_obj->sg );
@@ -1531,28 +1538,35 @@ void release_read_write( struct hyperion_device* device )
 //-------------------------------------------------------------------------------------------
 // The following functions may be useful for a larger audience.
 // copied from streaming tape device driver st.c
-static int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_pages,
-                               unsigned long uaddr, size_t count, int rw )
+static int
+sgl_map_user_pages( struct scatterlist *sgl, const unsigned int max_pages,
+                    unsigned long uaddr, size_t count, int rw )
 //-------------------------------------------------------------------------------------------
 {
     unsigned long end = ( uaddr + count + PAGE_SIZE - 1 ) >> PAGE_SHIFT;
     unsigned long start = uaddr >> PAGE_SHIFT;
     const int nr_pages = end - start;
     int res, i, j;
-    struct page** pages;
+    struct page **pages;
 
-    PRINTKM( MEM, ( PKTD "sgl_map_user_pages() sgl p%p max_pages 0x%u uaddr 0x%lx count 0x%zx end 0x%lx start 0x%lx nr_pages 0x%x\n", -1, sgl, max_pages, uaddr, count, end, start, nr_pages ) );
+    PRINTKM( MEM,
+             ( PKTD "sgl_map_user_pages() sgl p%p max_pages 0x%u uaddr 0x%lx "
+                    "count 0x%zx end 0x%lx start 0x%lx nr_pages 0x%x\n",
+               -1, sgl, max_pages, uaddr, count, end, start, nr_pages ) );
     /* User attempted Overflow! */
     if( ( uaddr + count ) < uaddr )
     {
-        PRINTKM( FILE, ( PKTD "sgl_map_user_pages() (uaddr + count) < uaddr \n", -1 ) );
+        PRINTKM(
+            FILE,
+            ( PKTD "sgl_map_user_pages() (uaddr + count) < uaddr \n", -1 ) );
         return -EINVAL;
     }
 
     /* Too big */
     if( nr_pages > max_pages )
     {
-        PRINTKM( FILE, ( PKTD "sgl_map_user_pages() nr_pages > max_pages\n", -1 ) );
+        PRINTKM( FILE,
+                 ( PKTD "sgl_map_user_pages() nr_pages > max_pages\n", -1 ) );
         return -ENOMEM;
     }
 
@@ -1565,28 +1579,65 @@ static int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_p
 
     if( ( pages = vmalloc( max_pages * sizeof( *pages ) ) ) == NULL )
     {
-        PRINTKM( FILE, ( PKTD "pages == NULL vmalloc returns NULL ( size 0x%zx )\n", -1, ( max_pages * sizeof( *pages ) ) ) );
+        PRINTKM( FILE,
+                 ( PKTD "pages == NULL vmalloc returns NULL ( size 0x%zx )\n",
+                   -1, ( max_pages * sizeof( *pages ) ) ) );
         return -ENOMEM;
     }
 
-    /* Try to fault in all of the necessary pages */
-    //PRINTKM(MEM,(PKTD "sgl_map_user_pages() down_read(&current->mm->mmap_sem)\n", -1 ));
+/* Try to fault in all of the necessary pages */
+// PRINTKM(MEM,(PKTD "sgl_map_user_pages()
+// down_read(&current->mm->mmap_sem)\n", -1 ));
+#ifdef MMAP_LOCK_INITIALIZER
+    mmap_read_lock( current->mm );
+#else
     down_read( &current->mm->mmap_sem );
+#endif
     /* rw==READ means read from drive, write into memory area */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION( 6, 5, 0 )
     {
         int locked = 1;
-        res = get_user_pages_locked( uaddr, nr_pages, rw == READ ? FOLL_WRITE : 0, pages, &locked );
+        res = get_user_pages_remote( current->mm, uaddr, nr_pages,
+                                     rw == READ ? FOLL_WRITE : 0, pages,
+                                     &locked );
         if( locked )
         {
+            mmap_read_unlock( current->mm );
+        }
+    }
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION( 5, 18, 0 )
+    {
+        int locked = 1;
+        res = get_user_pages_remote( uaddr, nr_pages,
+                                     rw == READ ? FOLL_WRITE : 0, pages, NULL,
+                                     &locked );
+        if( locked )
+        {
+            mmap_read_unlock( current->mm );
+        }
+    }
+
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION( 4, 9, 0 )
+    {
+        int locked = 1;
+        res = get_user_pages_locked(
+            uaddr, nr_pages, rw == READ ? FOLL_WRITE : 0, pages, &locked );
+        if( locked )
+        {
+#ifdef MMAP_LOCK_INITIALIZER
+            mmap_read_unlock( current->mm );
+#else
             up_read( &current->mm->mmap_sem );
+#endif
         }
     }
 #else
-    res = get_user_pages( current, current->mm, uaddr, nr_pages, rw == READ, 0, pages, NULL );
+    res = get_user_pages( current, current->mm, uaddr, nr_pages, rw == READ, 0,
+                          pages, NULL );
     up_read( &current->mm->mmap_sem );
 #endif
-    //PRINTKM(MEM,(PKTD "get_user_pages[_locked]() returns %d nr_pages %d \n", -1, res, nr_pages));
+    // PRINTKM(MEM,(PKTD "get_user_pages[_locked]() returns %d nr_pages %d \n",
+    // -1, res, nr_pages));
 
     /* Errors and no page mapped should return here */
     if( res < nr_pages )
@@ -1596,7 +1647,8 @@ static int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_p
 
     for( i = 0; i < nr_pages; i++ )
     {
-        //FIXME: flush superflous for rw==READ, probably wrong function for rw==WRITE
+        // FIXME: flush superflous for rw==READ, probably wrong function for
+        // rw==WRITE
         flush_dcache_page( pages[i] );
     }
 
@@ -1612,18 +1664,20 @@ static int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_p
     sgl[0].length = PAGE_SIZE - sgl[0].offset;
 #endif
     /*#if !defined(CONFIG_HIGHMEM64G) && (BITS_PER_LONG == 32)
-        PRINTKM(MEM,(PKTD "sgl_map_user_pages() page %p __pa 0x%x off 0x%x len 0x%x\n", -1, sgl[0].page, sgl[0].dma_address, sgl[0].offset, sgl[0].length));
-    #else
-        PRINTKM(MEM,(PKTD "sgl_map_user_pages() page %p __pa 0x%llx off 0x%x len 0x%x\n", -1, sgl[0].page, sgl[0].dma_address, sgl[0].offset, sgl[0].length));
-    #endif*/
+        PRINTKM(MEM,(PKTD "sgl_map_user_pages() page %p __pa 0x%x off 0x%x len
+    0x%x\n", -1, sgl[0].page, sgl[0].dma_address, sgl[0].offset,
+    sgl[0].length)); #else PRINTKM(MEM,(PKTD "sgl_map_user_pages() page %p __pa
+    0x%llx off 0x%x len 0x%x\n", -1, sgl[0].page, sgl[0].dma_address,
+    sgl[0].offset, sgl[0].length)); #endif*/
     if( nr_pages > 1 )
     {
         sgl[0].length = PAGE_SIZE - sgl[0].offset;
         count -= sgl[0].length;
-        for( i = 1; i < nr_pages ; i++ )
+        for( i = 1; i < nr_pages; i++ )
         {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 24 )
-            sg_set_page( &sgl[i], pages[i], ( count < PAGE_SIZE ? count : PAGE_SIZE ), 0 );
+            sg_set_page( &sgl[i], pages[i],
+                         ( count < PAGE_SIZE ? count : PAGE_SIZE ), 0 );
 #else
             sgl[i].offset = 0;
             sgl[i].page = pages[i];
@@ -1632,10 +1686,12 @@ static int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_p
 #endif
             count -= PAGE_SIZE;
             /*#if !defined(CONFIG_HIGHMEM64G) && (BITS_PER_LONG == 32)
-                PRINTKM(MEM,(PKTD "sgl_map_user_pages() page[%d] %p __pa 0x%x off 0x%x len 0x%x\n", -1, i, sgl[i].page, sgl[i].dma_address, sgl[i].offset, sgl[i].length ));
-            #else
-                PRINTKM(MEM,(PKTD "sgl_map_user_pages() page[%d] %p __pa 0x%llx off 0x%x len 0x%x\n", -1, i, sgl[i].page, sgl[i].dma_address, sgl[i].offset, sgl[i].length ));
-            #endif*/
+                PRINTKM(MEM,(PKTD "sgl_map_user_pages() page[%d] %p __pa 0x%x
+            off 0x%x len 0x%x\n", -1, i, sgl[i].page, sgl[i].dma_address,
+            sgl[i].offset, sgl[i].length )); #else PRINTKM(MEM,(PKTD
+            "sgl_map_user_pages() page[%d] %p __pa 0x%llx off 0x%x len 0x%x\n",
+            -1, i, sgl[i].page, sgl[i].dma_address, sgl[i].offset,
+            sgl[i].length )); #endif*/
         }
     }
     else
@@ -1647,7 +1703,10 @@ static int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_p
     return nr_pages;
 
 out_unmap:
-    PRINTKM( FILE, ( PKTD "error: get_user_pages[_locked]() returns %d nr_pages %d\n", -1, res, nr_pages ) );
+    PRINTKM( FILE,
+             ( PKTD
+               "error: get_user_pages[_locked]() returns %d nr_pages %d\n",
+               -1, res, nr_pages ) );
     if( res > 0 )
     {
         for( j = 0; j < res; j++ )
@@ -1724,14 +1783,16 @@ struct user_buffer_list* get_user_buffer_obj( struct hyperion_device* device, ch
 
 
 //-------------------------------------------------------------------------------------------
-static int setup_buffering( struct kiocb* iocb, char __user* buf, size_t count, int is_read, struct user_buffer_list** ubuf_obj_result )
+static int
+setup_buffering( struct kiocb *iocb, char __user *buf, size_t count,
+                 int is_read, struct user_buffer_list **ubuf_obj_result )
 //-------------------------------------------------------------------------------------------
 {
-    struct hyperion_device* device = ( struct hyperion_device* )iocb->ki_filp->private_data;
+    struct hyperion_device *device
+        = (struct hyperion_device *)iocb->ki_filp->private_data;
     int nr_pages;
     unsigned short use_sg;
-    struct user_buffer_list* ubuf_obj = NULL;
-
+    struct user_buffer_list *ubuf_obj = NULL;
 
     *ubuf_obj_result = 0;
     use_sg = count / PAGE_SIZE + 4;
@@ -1748,50 +1809,64 @@ static int setup_buffering( struct kiocb* iocb, char __user* buf, size_t count, 
         ubuf_obj->sg = vmalloc( use_sg * sizeof( struct scatterlist ) );
         if( ubuf_obj->sg == NULL )
         {
-            PRINTKM( MEM, ( PKTD " %s vmalloc for sglist failed use_sg %d sizeof sg %lx\n", device->index, __FUNCTION__,  use_sg, ( long unsigned int )sizeof( struct scatterlist ) ) );
+            PRINTKM(
+                MEM,
+                ( PKTD
+                  " %s vmalloc for sglist failed use_sg %d sizeof sg %lx\n",
+                  device->index, __FUNCTION__, use_sg,
+                  (long unsigned int)sizeof( struct scatterlist ) ) );
             return -ENOMEM;
         }
         ubuf_obj->buf = buf;
         ubuf_obj->count = count;
-        nr_pages = sgl_map_user_pages( ubuf_obj->sg, use_sg, ( unsigned long )buf, count, ( is_read ? READ : WRITE ) );
-        PRINTKM( MEM, ( PKTD " %s sgl_map_user_pages > result %d ioobj->sg p%p\n", device->index, __FUNCTION__,  nr_pages, ubuf_obj->sg ) );
+        nr_pages
+            = sgl_map_user_pages( ubuf_obj->sg, use_sg, (unsigned long)buf,
+                                  count, ( is_read ? READ : WRITE ) );
+        PRINTKM( MEM,
+                 ( PKTD " %s sgl_map_user_pages > result %d ioobj->sg p%p\n",
+                   device->index, __FUNCTION__, nr_pages, ubuf_obj->sg ) );
         if( nr_pages > 0 )
         {
             int i, dma_map_result = nr_pages, map_result;
             dma_addr_t addr;
-            struct scatterlist* sgl = ubuf_obj->sg;
+            struct scatterlist *sgl = ubuf_obj->sg;
             for( i = 0; i < nr_pages; i++ )
             {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 24 )
-                addr = pci_map_page( device->pdev, sg_page( &sgl[i] ), 0, PAGE_SIZE, PCI_DMA_FROMDEVICE );
+                addr = dma_map_page( &device->pdev->dev, sg_page( &sgl[i] ), 0,
+                                     PAGE_SIZE, DMA_FROM_DEVICE );
 #else
-                addr = pci_map_page( device->pdev, sgl[i].page, 0, PAGE_SIZE, PCI_DMA_FROMDEVICE );
+                addr = pci_map_page( device->pdev, sgl[i].page, 0, PAGE_SIZE,
+                                     PCI_DMA_FROMDEVICE );
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 27 )
-                map_result = pci_dma_mapping_error( device->pdev, addr );
+                map_result = dma_mapping_error( &device->pdev->dev, addr );
 #else
                 map_result = pci_dma_mapping_error( addr );
 #endif
                 if( map_result != 0 )
                 {
-                    printk( " %s %d pci_map_page() failed res %d\n", __FUNCTION__, __LINE__, map_result );
+                    printk( " %s %d pci_map_page() failed res %d\n",
+                            __FUNCTION__, __LINE__, map_result );
                     dma_map_result = -ENOMEM;
                     break;
                 }
                 sgl[i].dma_address = addr;
             }
-            //if (STbp->do_dio)
+            // if (STbp->do_dio)
             //{
-            //  STp->nbr_dio++;
-            //  STp->nbr_pages += STbp->do_dio;
-            //  for (i=1; i < STbp->do_dio; i++)
-            //      if (page_to_pfn(STbp->sg[i].page) == page_to_pfn(STbp->sg[i-1].page) + 1)
-            //          STp->nbr_combinable++;
-            //}
+            //   STp->nbr_dio++;
+            //   STp->nbr_pages += STbp->do_dio;
+            //   for (i=1; i < STbp->do_dio; i++)
+            //       if (page_to_pfn(STbp->sg[i].page) ==
+            //       page_to_pfn(STbp->sg[i-1].page) + 1)
+            //           STp->nbr_combinable++;
+            // }
             if( dma_map_result <= 0 )
             {
-                printk( " %s %d dma_map_sg() failed result %d index[%d]\n", __FUNCTION__, __LINE__, dma_map_result, i );
+                printk( " %s %d dma_map_sg() failed result %d index[%d]\n",
+                        __FUNCTION__, __LINE__, dma_map_result, i );
                 vfree( ubuf_obj->sg );
                 vfree( ubuf_obj );
                 return 0;
@@ -2041,11 +2116,20 @@ ssize_t async_io_write( struct kiocb* iocb, const struct iovec* iocv, unsigned l
 }
 #else
 //-------------------------------------------------------------------------------------------
-ssize_t async_io_read( struct kiocb* iocb, struct iov_iter* iocv_iter )
+ssize_t
+async_io_read( struct kiocb *iocb, struct iov_iter *iocv_iter )
 //-------------------------------------------------------------------------------------------
 {
-    //  printk( " %s iov_base p%p iov_len %d count %d pos %d\n", __FUNCTION__, iocv->iov_base, (int)iocv->iov_len, (int)count, pos );
-    return async_read_write( iocb, ( char __user* )iocv_iter->iov->iov_base, iocv_iter->iov->iov_len, iocv_iter->iov_offset, TRUE );
+#if LINUX_VERSION_CODE >= KERNEL_VERSION( 6, 4, 0 )
+    const struct iovec *iov = iter_iov( iocv_iter );
+#else
+    const struct iovec *iov = iocv_iter->iov;
+#endif
+
+    //  printk( " %s iov_base p%p iov_len %d count %d pos %d\n", __FUNCTION__,
+    //  iocv->iov_base, (int)iocv->iov_len, (int)count, pos );
+    return async_read_write( iocb, iov->iov_base, iov->iov_len,
+                             iocv_iter->iov_offset, TRUE );
 }
 
 //-------------------------------------------------------------------------------------------
@@ -2101,4 +2185,3 @@ void abort_transfer( struct hyperion_device* device )
     }
     //PRINTKM(DMA,(PKTD " -%s %lu\n", device->index, __FUNCTION__, jiffies));
 }//abort_transfer
-
