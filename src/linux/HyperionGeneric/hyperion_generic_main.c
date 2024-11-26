@@ -117,15 +117,17 @@ EXPORT_SYMBOL( hyperion_class_device_create );
 
 //-------------------------------------------------------------------------------------------
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 26 )
-struct device* hyperion_serial_class_device_create( void* device, dev_t dev_num )
+struct device *
+hyperion_serial_class_device_create( void *device, dev_t dev_num )
 //-------------------------------------------------------------------------------------------
 {
-    struct device* class_member;
+    struct device *class_member;
 #else
-struct class_device* hyperion_serial_class_device_create( void* device, dev_t dev_num )
+struct class_device *
+hyperion_serial_class_device_create( void *device, dev_t dev_num )
 //-------------------------------------------------------------------------------------------
 {
-    struct class_device* class_member;
+    struct class_device *class_member;
 #endif
     unsigned int minor_num;
     if( !hyperion_class )
@@ -135,21 +137,25 @@ struct class_device* hyperion_serial_class_device_create( void* device, dev_t de
     minor_num = MINOR( dev_num );
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 26 )
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 27 )
-    class_member = device_create( hyperion_class, NULL, dev_num, NULL, "hyperion-cl%d", minor_num );
+    class_member = device_create( hyperion_class, NULL, dev_num, NULL,
+                                  "hyperion-cl%d", minor_num );
 #else
-    class_member = device_create( hyperion_class, NULL, dev_num, "hyperion-cl%d", minor_num );
+    class_member = device_create( hyperion_class, NULL, dev_num,
+                                  "hyperion-cl%d", minor_num );
 #endif
-    dev_set_drvdata( class_member, ( void* )device );
+    dev_set_drvdata( class_member, (void *)device );
 #else
-    class_member = class_device_create( hyperion_class, NULL, dev_num, NULL, "hyperion-cl%d", minor_num );
-    class_set_devdata( class_member, ( void* )device );
+    class_member = class_device_create( hyperion_class, NULL, dev_num, NULL,
+                                        "hyperion-cl%d", minor_num );
+    class_set_devdata( class_member, (void *)device );
 #endif
     return class_member;
 }
 EXPORT_SYMBOL( hyperion_serial_class_device_create );
 
 //-------------------------------------------------------------------------------------------
-void hyperion_class_device_destroy( dev_t dev_num )
+void
+hyperion_class_device_destroy( dev_t dev_num )
 //-------------------------------------------------------------------------------------------
 {
     int i;
@@ -171,7 +177,8 @@ void hyperion_class_device_destroy( dev_t dev_num )
 EXPORT_SYMBOL( hyperion_class_device_destroy );
 
 //-------------------------------------------------------------------------------------------
-void hyperion_serial_class_device_destroy( dev_t dev_num )
+void
+hyperion_serial_class_device_destroy( dev_t dev_num )
 //-------------------------------------------------------------------------------------------
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 26 )
@@ -183,34 +190,44 @@ void hyperion_serial_class_device_destroy( dev_t dev_num )
 EXPORT_SYMBOL( hyperion_serial_class_device_destroy );
 
 //-------------------------------------------------------------------------------------------
-static int __init hyperion_generic_init( void )
+static int __init
+hyperion_generic_init( void )
 //-------------------------------------------------------------------------------------------
 {
     int i, result = 0;
-    //printk( " %s\n", __FUNCTION__ );
-    if( register_chrdev( 240, "hyperion_generic", &fops ) == 0 )
+    // printk( " %s\n", __FUNCTION__ );
+
+    int res = register_chrdev( 240, "hyperion_generic", &fops );
+    if( res != 0 )
     {
-        /* create sysfs class for hyperion */
-        hyperion_class = class_create( THIS_MODULE, "hyperion" );
-        if( IS_ERR( hyperion_class ) && PTR_ERR( hyperion_class ) != -EEXIST )
-        {
-            /* tidy up after error */
-            result = PTR_ERR( hyperion_class );
-            printk( " %s error %d\n", __FUNCTION__, result );
-            class_destroy( hyperion_class );
-            unregister_chrdev( 240, "hyperion_generic" );
-            return result;
-        }
+        printk( KERN_ERR "could not register hyperion as char dev 240: %d\n",
+                res );
+        return -EIO;
+    }
 
-        for( i = 0; i < MAX_DEVICE; i++ )
-        {
-            device_map[i].index = i;
-            device_map[i].used = 0;
-        }
+    /* create sysfs class for hyperion */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,4,0)
+    hyperion_class = class_create( "hyperion" );
+#else
+    hyperion_class = class_create( THIS_MODULE, "hyperion" );
+#endif
+    if( IS_ERR( hyperion_class ) && PTR_ERR( hyperion_class ) != -EEXIST )
+    {
+        /* tidy up after error */
+        result = PTR_ERR( hyperion_class );
+        printk( " %s error %d\n", __FUNCTION__, result );
+        class_destroy( hyperion_class );
+        unregister_chrdev( 240, "hyperion_generic" );
+        return result;
+    }
 
-        return 0;
-    };
-    return -EIO;
+    for( i = 0; i < MAX_DEVICE; i++ )
+    {
+        device_map[i].index = i;
+        device_map[i].used = 0;
+    }
+
+    return 0;
 }
 
 //-------------------------------------------------------------------------------------------
@@ -225,4 +242,3 @@ static void __exit hyperion_generic_exit( void )
 module_init( hyperion_generic_init );
 module_exit( hyperion_generic_exit );
 MODULE_LICENSE( "GPL" );
-
