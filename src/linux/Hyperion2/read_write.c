@@ -497,10 +497,17 @@ ssize_t async_io_write( struct kiocb* iocb, const struct iovec* iocv, unsigned l
 }
 #else
 //-------------------------------------------------------------------------------------------
-ssize_t async_io_read( struct kiocb* iocb, struct iov_iter* iocv_iter )
+ssize_t
+async_io_read( struct kiocb *iocb, struct iov_iter *iocv_iter )
 //-------------------------------------------------------------------------------------------
 {
-    return async_read_write( iocb, ( char __user* )iocv_iter->iov->iov_base, iocv_iter->iov->iov_len, iocv_iter->iov_offset, TRUE );
+#if LINUX_VERSION_CODE >= KERNEL_VERSION( 6, 4, 0 )
+    const struct iovec *iov = iter_iov( iocv_iter );
+#else
+    const struct iovec *iov = iocv_iter->iov;
+#endif
+    return async_read_write( iocb, (char __user *)iov->iov_base, iov->iov_len,
+                             iocv_iter->iov_offset, TRUE );
 }
 
 //-------------------------------------------------------------------------------------------
