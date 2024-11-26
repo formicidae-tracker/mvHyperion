@@ -16,6 +16,7 @@ hyperion2-y  := drivermain.o \
 	../../common/Hyperion/PoCLControl.o \
 	../../common/Hyperion/external_boot.o \
 	../../common/Hyperion/uart_read_write.o \
+	../common/utils.o \
 	iocontrol.o \
 	user_buffer.o \
 	read_write.o \

@@ -19,6 +19,7 @@
 #include "dma_sg_list_buffer.h"
 #include "drivermain.h"
 #include "hyperion_base.h"
+#include <utils.h>
 
 static HYPERION_BASE_REGISTER_DEF CLeRegisterBaseA32[ebrhMax] = {
 #include "hyperion_register_a32.h"
@@ -323,12 +324,15 @@ irqreturn_t hyperion_interrupt( int irq, void* dev_id )
 }
 
 //-------------------------------------------------------------------------------------------
-void hyperion_do_tasklet( unsigned long index )
+void
+hyperion_do_tasklet( unsigned long index )
 //-------------------------------------------------------------------------------------------
 {
-    struct hyperion* phyperion = get_hyperion( index );
-    struct hyperion_device* phyp_dev = ( struct hyperion_device* )phyperion->device;
-    struct hyperion_request_packet* phyperion_request_packet = NULL;
+    printk( KERN_INFO "tasklet is here\n" );
+    struct hyperion *phyperion = get_hyperion( index );
+    struct hyperion_device *phyp_dev
+        = (struct hyperion_device *)phyperion->device;
+    struct hyperion_request_packet *phyperion_request_packet = NULL;
     TItem isr_result;
     message_item msg_it;
     unsigned char read_ok;
@@ -338,14 +342,18 @@ void hyperion_do_tasklet( unsigned long index )
 
     do
     {
-        _PIPE_READ_LOCK( phyp_dev->interrupt_result_pipe, &isr_result, read_ok );
+        _PIPE_READ_LOCK( phyp_dev->interrupt_result_pipe, &isr_result,
+                         read_ok );
         if( read_ok == 0 )
         {
             break;
         }
-        //printk( " %s isr_result.status 0x%x\n", __FUNCTION__, isr_result.status );
+        // printk( " %s isr_result.status 0x%x\n", __FUNCTION__,
+        // isr_result.status );
         if( isr_result.status & A2P_MAILBOX_INT0 )
         {
+            printk( KERN_INFO "tasklet is signaling\n" );
+
             signal_sema( phyp_dev->sema_message_received, 1 );
         }
 
@@ -353,35 +361,44 @@ void hyperion_do_tasklet( unsigned long index )
         {
             do
             {
-                if( _ITEMS_IN_MSG_PIPE_LE32( phyp_dev->request_result_message ) )
+                if( _ITEMS_IN_MSG_PIPE_LE32(
+                        phyp_dev->request_result_message ) )
                 {
-                    spin_lock_irqsave( &phyp_dev->ioctl_lock.s_tasklet, irqflags );
-                    _READ_MSG_PIPE_LE32( phyp_dev->request_result_message, msg_it );
-                    spin_unlock_irqrestore( &phyp_dev->ioctl_lock.s_tasklet, irqflags );
+                    spin_lock_irqsave( &phyp_dev->ioctl_lock.s_tasklet,
+                                       irqflags );
+                    _READ_MSG_PIPE_LE32( phyp_dev->request_result_message,
+                                         msg_it );
+                    spin_unlock_irqrestore( &phyp_dev->ioctl_lock.s_tasklet,
+                                            irqflags );
                 }
                 else
                 {
                     break;
                 }
-                //printk(" %s isr_result.status 0x%x message 0x%x\n", __FUNCTION__, isr_result.status, msg_it.message );
+                // printk(" %s isr_result.status 0x%x message 0x%x\n",
+                // __FUNCTION__, isr_result.status, msg_it.message );
                 dto_index = _GET_MESSAGE_QUEUE_ID( msg_it.message );
-                phyperion_request_packet = get_current_iocb( phyp_dev->pdma_object[dto_index]->rw_queue );
+                phyperion_request_packet = get_current_iocb(
+                    phyp_dev->pdma_object[dto_index]->rw_queue );
                 if( phyperion_request_packet != NULL )
                 {
                     // read message from nios
                     write_results_to_rq( phyp_dev, phyperion_request_packet );
-                    complete_request( phyperion_request_packet, 0 ); //!phyperion_request_packet will be freed in complete_request()
+                    complete_request( phyperion_request_packet,
+                                      0 ); //! phyperion_request_packet will be
+                                           //! freed in complete_request()
                     phyperion_request_packet = NULL;
-                    run_next_iocb( phyp_dev->pdma_object[dto_index]->rw_queue );
+                    run_next_iocb(
+                        phyp_dev->pdma_object[dto_index]->rw_queue );
                 }
-            }
-            while( 1 );
+            } while( 1 );
         }
 
         if( isr_result.status & A2P_MAILBOX_INT2 )
         {
             unsigned int mb2 = _READ_MAILBOX( OFF_A2P_MAILBOX2 );
-            IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhPCICore, OFF_P2A_MAILBOX2, mb2 );
+            IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def,
+                         ebrhPCICore, OFF_P2A_MAILBOX2, mb2 );
             PRINTKM( INTR, ( PKTD " msg: 0x%08x\n", phyperion->number, mb2 ) );
         }
 
@@ -390,19 +407,18 @@ void hyperion_do_tasklet( unsigned long index )
             switch( isr_result.status & AVL_IRQ_INPUT_VECTOR )
             {
             case UART0_IRQ_VEC:
-                {
-                    read_serial( &phyp_dev->uart_port[0] );
-                    break;
-                }
+            {
+                read_serial( &phyp_dev->uart_port[0] );
+                break;
+            }
             case UART1_IRQ_VEC:
-                {
-                    read_serial( &phyp_dev->uart_port[1] );
-                    break;
-                }
+            {
+                read_serial( &phyp_dev->uart_port[1] );
+                break;
+            }
             }
         }
-    }
-    while( 1 );
+    } while( 1 );
 }
 
 //-------------------------------------------------------------------------------------------
@@ -581,47 +597,79 @@ int start_transfer( struct hyperion_request_packet* phyperion_request_packet, in
 }
 
 //-------------------------------------------------------------------------------------------
-void hyperion_func_abort_transfer( struct hyperion* phyperion )
+void
+hyperion_func_abort_transfer( struct hyperion *phyperion )
 //-------------------------------------------------------------------------------------------
 {
     DECLARE_WAIT_QUEUE_HEAD( wq );
-    struct hyperion_device* phyp_dev = ( struct hyperion_device* )phyperion->device;
-    struct hyperion_request_packet* phyperion_request_packet;
-    struct dma_transfer_object* dto;
-    TPropertyElement* list_request_result;
+    struct hyperion_device *phyp_dev
+        = (struct hyperion_device *)phyperion->device;
+    struct hyperion_request_packet *phyperion_request_packet;
+    struct dma_transfer_object *dto;
+    TPropertyElement *list_request_result;
     int i;
     const int timeout_msec = 100;
     unsigned int message = MESSAGE_TYPE_ABORT_REQUESTS;
     unsigned int bytes_to_copy;
 
-    PRINTKM( DMA, ( PKTD " >%s %lu\n", phyperion->number, __FUNCTION__, jiffies ) );
+    PRINTKM( DMA,
+             ( PKTD " >%s %lu\n", phyperion->number, __FUNCTION__, jiffies ) );
     for( i = 0; i < MAX_PARALLEL_TRANSFER; i++ )
     {
         dto = phyp_dev->pdma_object[i];
         if( get_current_iocb( dto->rw_queue ) )
         {
             transmit_message( phyp_dev, message, timeout_msec, NULL, 0, NULL );
-            while( ( phyperion_request_packet = run_next_iocb( dto->rw_queue ) ) != NULL )
+            while(
+                ( phyperion_request_packet = run_next_iocb( dto->rw_queue ) )
+                != NULL )
             {
-                list_request_result = phyperion_request_packet->result_property;
-                PRINTKM( DMA, ( PKTD " %s abort and release reqid %d (==%x) \n", phyp_dev->number, __FUNCTION__, phyperion_request_packet->parameters.reqid, phyperion_request_packet->parameters.reqid ) );
-                _SET_PROP_ELEM_I( list_request_result, prSResPropertyCount, prSnapRequestResultMax, TRUE );
-                _SET_PROP_ELEM_I( list_request_result, prSResStatus, cerrDMAAborted, TRUE );
-                _SET_PROP_ELEM_I( list_request_result, prSResRequestID, phyperion_request_packet->parameters.reqid, TRUE );
-                _SET_PROP_ELEM_I( list_request_result, prSResTimeStampLowPart, 0, TRUE );
-                _SET_PROP_ELEM_I( list_request_result, prSResTimeStampHighPart, 0, TRUE );
-                _SET_PROP_ELEM_I( list_request_result, prSResScanPixLine0, phyperion_request_packet->scan_pixel_line0, TRUE );
-                _SET_PROP_ELEM_I( list_request_result, prSResScanPixLine1, phyperion_request_packet->scan_pixel_line1, TRUE );
-                _SET_PROP_ELEM_I( list_request_result, prSResScanLines, phyperion_request_packet->scan_lines, TRUE );
-                _SET_PROP_ELEM_I( list_request_result, prSresBytesTransferredSoFar, 0, TRUE );
-                bytes_to_copy = sizeof( phyperion_request_packet->result_property ) < phyperion_request_packet->request_buffer.trailerBufferSize ? sizeof( phyperion_request_packet->result_property ) : phyperion_request_packet->request_buffer.trailerBufferSize;
-                hyperion_copy_to_trailer( &phyperion_request_packet->trailer_buffer_descr, ( char* )phyperion_request_packet->result_property, bytes_to_copy );
+                list_request_result
+                    = phyperion_request_packet->result_property;
+                PRINTKM( DMA,
+                         ( PKTD " %s abort and release reqid %d (==%x) \n",
+                           phyp_dev->number, __FUNCTION__,
+                           phyperion_request_packet->parameters.reqid,
+                           phyperion_request_packet->parameters.reqid ) );
+                _SET_PROP_ELEM_I( list_request_result, prSResPropertyCount,
+                                  prSnapRequestResultMax, TRUE );
+                _SET_PROP_ELEM_I( list_request_result, prSResStatus,
+                                  cerrDMAAborted, TRUE );
+                _SET_PROP_ELEM_I( list_request_result, prSResRequestID,
+                                  phyperion_request_packet->parameters.reqid,
+                                  TRUE );
+                _SET_PROP_ELEM_I( list_request_result, prSResTimeStampLowPart,
+                                  0, TRUE );
+                _SET_PROP_ELEM_I( list_request_result, prSResTimeStampHighPart,
+                                  0, TRUE );
+                _SET_PROP_ELEM_I( list_request_result, prSResScanPixLine0,
+                                  phyperion_request_packet->scan_pixel_line0,
+                                  TRUE );
+                _SET_PROP_ELEM_I( list_request_result, prSResScanPixLine1,
+                                  phyperion_request_packet->scan_pixel_line1,
+                                  TRUE );
+                _SET_PROP_ELEM_I( list_request_result, prSResScanLines,
+                                  phyperion_request_packet->scan_lines, TRUE );
+                _SET_PROP_ELEM_I( list_request_result,
+                                  prSresBytesTransferredSoFar, 0, TRUE );
+                bytes_to_copy
+                    = sizeof( phyperion_request_packet->result_property )
+                              < phyperion_request_packet->request_buffer
+                                    .trailerBufferSize
+                          ? sizeof( phyperion_request_packet->result_property )
+                          : phyperion_request_packet->request_buffer
+                                .trailerBufferSize;
+                hyperion_copy_to_trailer(
+                    &phyperion_request_packet->trailer_buffer_descr,
+                    (char *)phyperion_request_packet->result_property,
+                    bytes_to_copy );
                 complete_request( phyperion_request_packet, 0 );
             }
         }
     }
-    PRINTKM( DMA, ( PKTD " <%s %lu\n", phyperion->number, __FUNCTION__, jiffies ) );
-}//abort_transfer
+    PRINTKM( DMA,
+             ( PKTD " <%s %lu\n", phyperion->number, __FUNCTION__, jiffies ) );
+} // abort_transfer
 
 //-------------------------------------------------------------------------------------------
 int hyperion_func_async_read( struct hyperion* phyperion, struct hyperion_request_packet* phyperion_request_packet )
@@ -921,7 +969,8 @@ int hyperion_func_enable_interrupt( struct hyperion* phyperion )
 }
 
 //-------------------------------------------------------------------------------------------
-int query_processor_system_infos( struct hyperion_device* phyp_dev )
+int
+query_processor_system_infos( struct hyperion_device *phyp_dev )
 //-------------------------------------------------------------------------------------------
 {
     int result = 0;
@@ -931,14 +980,18 @@ int query_processor_system_infos( struct hyperion_device* phyp_dev )
     if( result < 0 || cpu_clk_hz == 0 )
     {
         cpu_clk_hz = 100 * 1000000;
+        printk( KERN_ERR "could not query system infos: %d %s\n", result,
+                strkerr( result ) );
     }
     phyp_dev->processor_info.cpu_clk_hz = cpu_clk_hz;
-    printk( " %s  fpga processor cpuclk_hz %d status %x", __FUNCTION__, phyp_dev->processor_info.cpu_clk_hz, result );
+    printk( " %s  fpga processor cpuclk_hz %d status %x", __FUNCTION__,
+            phyp_dev->processor_info.cpu_clk_hz, result );
     return result;
 }
 
 //-------------------------------------------------------------------------------------------
-void query_fpga_capabilities( struct hyperion_device* phyp_dev )
+void
+query_fpga_capabilities( struct hyperion_device *phyp_dev )
 //-------------------------------------------------------------------------------------------
 {
     int result = 0;
@@ -953,9 +1006,12 @@ void query_fpga_capabilities( struct hyperion_device* phyp_dev )
     }
     else
     {
+        printk( KERN_ERR "could not query fpga capabilities: %d %s\n", result,
+                strkerr( result ) );
         phyp_dev->fpga_info.capabilities = 0;
     }
-    PRINTKM( IO, ( PKTD " %s  fpga info 0x%x", phyp_dev->number, __FUNCTION__, phyp_dev->fpga_info.capabilities ) );
+    PRINTKM( IO, ( PKTD " %s  fpga info 0x%x", phyp_dev->number, __FUNCTION__,
+                   phyp_dev->fpga_info.capabilities ) );
 }
 
 //-------------------------------------------------------------------------------------------
@@ -967,24 +1023,31 @@ void hyperion_halt_processor( struct hyperion* phyperion )
 }
 
 //-------------------------------------------------------------------------------------------
-int hyperion_boot_processor( struct hyperion_device* phyp_dev, void* apps, unsigned int size )
+int
+hyperion_boot_processor( struct hyperion_device *phyp_dev, void *apps,
+                         unsigned int size )
 //-------------------------------------------------------------------------------------------
 {
     int i, result = -ENODEV;
     const int retries = 10;
     for( i = 0; i < retries; i++ )
     {
-        if( start_nios_cpu( ( unsigned char* )phyp_dev->hyperion_base.base, apps, size ) )
+        if( start_nios_cpu( (unsigned char *)phyp_dev->hyperion_base.base,
+                            apps, size ) )
         {
-            wait_jiffies( msecs_to_jiffies( 100 ) );
+            wait_jiffies( msecs_to_jiffies( 500 ) );
             result = query_processor_system_infos( phyp_dev );
-            printk( " %s, hyperion board fpga processor started successfully status 0x%x\n", __FUNCTION__, result );
+            printk( " %s, hyperion board fpga processor started successfully "
+                    "status 0x%x\n",
+                    __FUNCTION__, result );
             query_fpga_capabilities( phyp_dev );
         }
         else
         {
             result = -ENXIO;
-            printk( " %s, hyperion board fpga processor not started status 0x%x\n", __FUNCTION__, result );
+            printk(
+                " %s, hyperion board fpga processor not started status 0x%x\n",
+                __FUNCTION__, result );
         }
         if( result == 0 )
         {
@@ -995,35 +1058,51 @@ int hyperion_boot_processor( struct hyperion_device* phyp_dev, void* apps, unsig
 }
 
 //-------------------------------------------------------------------------------------------
-int transmit_message( struct hyperion_device* phyp_dev, unsigned int message, unsigned int timeout_msec, void* buffer, unsigned int size, unsigned long* processor_result )
+int
+transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
+                  unsigned int timeout_msec, void *buffer, unsigned int size,
+                  unsigned long *processor_result )
 //-------------------------------------------------------------------------------------------
 {
     unsigned long irqflags;
     int wait, result = -ENODATA;
     spin_lock_irqsave( &phyp_dev->ioctl_lock.s_message, irqflags );
-    if( buffer != NULL && size > 0 && size <= SIZE_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS )
+    if( buffer != NULL && size > 0
+        && size <= SIZE_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS )
     {
-        memcpy( ( void* )( ( char* )phyp_dev->hyperion_base.base + ONCHIP_MEM_DATA_BASE + OFF_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS ), buffer, size );
+        memcpy( (void *)( (char *)phyp_dev->hyperion_base.base
+                          + ONCHIP_MEM_DATA_BASE
+                          + OFF_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS ),
+                buffer, size );
     }
     reset_sema( phyp_dev->sema_message_received );
-    IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhPCICore, OFF_P2A_MAILBOX0, message );
+    IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhPCICore,
+                 OFF_P2A_MAILBOX0, message );
     wait = msecs_to_jiffies( timeout_msec );
+    unsigned long start = jiffies;
+    printk( "current jiffies is timeout=%dms jiffies=%d %u\n", timeout_msec,
+            wait, start );
     while( wait > 0 )
     {
-        wait_jiffies( 1 );
-        result = wait_sema( phyp_dev->sema_message_received, 0 );
+        // wait_jiffies( 1 );
+        result = wait_sema( phyp_dev->sema_message_received, 1 );
         if( result == ObjSignaled )
         {
             break;
         }
         --wait;
     }
+    printk( "final jiffies is %u\n", jiffies - start );
     if( result == ObjSignaled )
     {
         if( processor_result != NULL )
         {
             *processor_result = _READ_MAILBOX( OFF_A2P_MAILBOX0 );
-            PRINTKM( IO, ( PKTD " %s result %x " " mailbox0 0x%lx" "\n", phyp_dev->number, __FUNCTION__, result, *processor_result ) );
+            PRINTKM( IO, ( PKTD " %s result %x "
+                                " mailbox0 0x%lx"
+                                "\n",
+                           phyp_dev->number, __FUNCTION__, result,
+                           *processor_result ) );
             result = 0;
         }
     }
