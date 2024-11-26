@@ -82,14 +82,19 @@ int sgl_get_max_pages( UINT_PTR uaddr, size_t count )
 //-------------------------------------------------------------------------------------------
 // The following functions may be useful for a larger audience.
 // copied from streaming tape device driver st.c
-int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_pages, UINT_PTR uaddr, size_t count, int rw )
+int
+sgl_map_user_pages( struct scatterlist *sgl, const unsigned int max_pages,
+                    UINT_PTR uaddr, size_t count, int rw )
 //-------------------------------------------------------------------------------------------
 {
     const int nr_pages = sgl_get_max_pages( uaddr, count );
     int res, i, j;
-    struct page** pages;
+    struct page **pages;
 
-    PRINTKM( MEM, ( "sgl_map_user_pages() sgl=p%p, max_pages=%u, uaddr=%p, count=0x%zx, nr_pages=%u\n", sgl, max_pages, ( void* )( ( UINT_PTR )uaddr ), count, nr_pages ) );
+    PRINTKM( MEM, ( "sgl_map_user_pages() sgl=p%p, max_pages=%u, uaddr=%p, "
+                    "count=0x%zx, nr_pages=%u\n",
+                    sgl, max_pages, (void *)( (UINT_PTR)uaddr ), count,
+                    nr_pages ) );
     /* User attempted Overflow! */
     if( ( uaddr + count ) < uaddr )
     {
@@ -113,28 +118,62 @@ int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_pages, U
 
     if( ( pages = vmalloc( max_pages * sizeof( *pages ) ) ) == NULL )
     {
-        PRINTKM( FILE, ( "pages == NULL vmalloc returns NULL ( size 0x%zx )\n", ( max_pages * sizeof( *pages ) ) ) );
+        PRINTKM( FILE, ( "pages == NULL vmalloc returns NULL ( size 0x%zx )\n",
+                         ( max_pages * sizeof( *pages ) ) ) );
         return -ENOMEM;
     }
 
-    /* Try to fault in all of the necessary pages */
-    //PRINTKM(MEM,( "sgl_map_user_pages() down_read(&current->mm->mmap_sem)\n" ));
+/* Try to fault in all of the necessary pages */
+// PRINTKM(MEM,( "sgl_map_user_pages() down_read(&current->mm->mmap_sem)\n" ));
+#ifdef MMAP_LOCK_INITIALIZER
+    mmap_read_lock( current->mm );
+#else
     down_read( &current->mm->mmap_sem );
+#endif
     /* rw==READ means read from drive, write into memory area */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION( 6, 5, 0 )
     {
         int locked = 1;
-        res = get_user_pages_locked( uaddr, nr_pages, rw == READ ? FOLL_WRITE : 0, pages, &locked );
+        res = get_user_pages_remote( current->mm, uaddr, nr_pages,
+                                     rw == READ ? FOLL_WRITE : 0, pages,
+                                     &locked );
         if( locked )
         {
+            mmap_read_unlock( current->mm );
+        }
+    }
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION( 5, 18, 0 )
+    {
+        int locked = 1;
+        res = get_user_pages_remote( uaddr, nr_pages,
+                                     rw == READ ? FOLL_WRITE : 0, pages, NULL,
+                                     &locked );
+        if( locked )
+        {
+            mmap_read_unlock( current->mm );
+        }
+    }
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION( 4, 9, 0 )
+    {
+        int locked = 1;
+        res = get_user_pages_locked(
+            uaddr, nr_pages, rw == READ ? FOLL_WRITE : 0, pages, &locked );
+        if( locked )
+        {
+#ifdef MMAP_LOCK_INITIALIZER
+            mmap_read_unlock( current->mm );
+#else
             up_read( &current->mm->mmap_sem );
+#endif
         }
     }
 #else
-    res = get_user_pages( current, current->mm, uaddr, nr_pages, rw == READ, 0, pages, NULL );
+    res = get_user_pages( current, current->mm, uaddr, nr_pages, rw == READ, 0,
+                          pages, NULL );
     up_read( &current->mm->mmap_sem );
 #endif
-    //PRINTKM(MEM,( "get_user_pages[_locked]() returns %d nr_pages %d \n", res, nr_pages));
+    // PRINTKM(MEM,( "get_user_pages[_locked]() returns %d nr_pages %d \n",
+    // res, nr_pages));
 
     /* Errors and no page mapped should return here */
     if( res < nr_pages )
@@ -144,7 +183,8 @@ int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_pages, U
 
     for( i = 0; i < nr_pages; i++ )
     {
-        //FIXME: flush superflous for rw==READ, probably wrong function for rw==WRITE
+        // FIXME: flush superflous for rw==READ, probably wrong function for
+        // rw==WRITE
         flush_dcache_page( pages[i] );
     }
 
@@ -161,19 +201,21 @@ int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_pages, U
 #endif
     /*
     #if !defined(CONFIG_HIGHMEM64G) && (BITS_PER_LONG == 32)
-        PRINTKM(MEM,( "sgl_map_user_pages() page %p __pa 0x%x off 0x%x len 0x%x\n", sg_page( &sgl[0] ), sgl[0].dma_address, sgl[0].offset, sgl[0].length));
-    #else
-        PRINTKM(MEM,( "sgl_map_user_pages() page %p __pa 0x%llx off 0x%x len 0x%x\n", sg_page( &sgl[0] ), sgl[0].dma_address, sgl[0].offset, sgl[0].length));
-    #endif
+        PRINTKM(MEM,( "sgl_map_user_pages() page %p __pa 0x%x off 0x%x len
+    0x%x\n", sg_page( &sgl[0] ), sgl[0].dma_address, sgl[0].offset,
+    sgl[0].length)); #else PRINTKM(MEM,( "sgl_map_user_pages() page %p __pa
+    0x%llx off 0x%x len 0x%x\n", sg_page( &sgl[0] ), sgl[0].dma_address,
+    sgl[0].offset, sgl[0].length)); #endif
     */
     if( nr_pages > 1 )
     {
         sgl[0].length = PAGE_SIZE - sgl[0].offset;
         count -= sgl[0].length;
-        for( i = 1; i < nr_pages ; i++ )
+        for( i = 1; i < nr_pages; i++ )
         {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 24 )
-            sg_set_page( &sgl[i], pages[i], ( count < PAGE_SIZE ? count : PAGE_SIZE ), 0 );
+            sg_set_page( &sgl[i], pages[i],
+                         ( count < PAGE_SIZE ? count : PAGE_SIZE ), 0 );
 #else
             sgl[i].offset = 0;
             sgl[i].page = pages[i];
@@ -184,10 +226,12 @@ int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_pages, U
 
             /*
             #if !defined(CONFIG_HIGHMEM64G) && (BITS_PER_LONG == 32)
-                PRINTKM(MEM,( "sgl_map_user_pages() page[%d] %p __pa 0x%x off 0x%x len 0x%x\n", i, sg_page( &sgl[i] ), sgl[i].dma_address, sgl[i].offset, sgl[i].length ));
-            #else
-                PRINTKM(MEM,( "sgl_map_user_pages() page[%d] %p __pa 0x%llx off 0x%x len 0x%x\n", i, sg_page( &sgl[i] ), sgl[i].dma_address, sgl[i].offset, sgl[i].length ));
-            #endif
+                PRINTKM(MEM,( "sgl_map_user_pages() page[%d] %p __pa 0x%x off
+            0x%x len 0x%x\n", i, sg_page( &sgl[i] ), sgl[i].dma_address,
+            sgl[i].offset, sgl[i].length )); #else PRINTKM(MEM,(
+            "sgl_map_user_pages() page[%d] %p __pa 0x%llx off 0x%x len 0x%x\n",
+            i, sg_page( &sgl[i] ), sgl[i].dma_address, sgl[i].offset,
+            sgl[i].length )); #endif
             */
         }
     }
@@ -200,7 +244,9 @@ int sgl_map_user_pages( struct scatterlist* sgl, const unsigned int max_pages, U
     return nr_pages;
 
 out_unmap:
-    PRINTKM( FILE, ( "error: get_user_pages[_locked]() returns %d nr_pages %d\n", res, nr_pages ) );
+    PRINTKM( FILE,
+             ( "error: get_user_pages[_locked]() returns %d nr_pages %d\n",
+               res, nr_pages ) );
     if( res > 0 )
     {
         for( j = 0; j < res; j++ )
