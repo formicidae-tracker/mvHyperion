@@ -63,9 +63,9 @@
 // Linux 'type' field. 'Access' is the Linux 'dir' field (2 bits). 'Function'
 // is the Linux 'nr' field (only 8 bits!).
 #define CTL_CODE( DeviceType, Function, Method, Access, size )                \
-    ( (__u32)( _IOC( ( Access & 0x3 ),                                        \
-                     ( DeviceType & 0x3f ) | ( ( Method & 0x3 ) << 6 ),       \
-                     ( Function & 0xff ), ( sizeof( size ) & 0x3fff ) ) ) )
+    ( ( __u32 )( _IOC( ( Access & 0x3 ),                                      \
+                       ( DeviceType & 0x3f ) | ( ( Method & 0x3 ) << 6 ),     \
+                       ( Function & 0xff ), ( sizeof( size ) & 0x3fff ) ) ) )
 // ...and our definition results in this...
 // 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07
 // 06 05 04 03 02 01 00 A  A  S  S  S  S  S  S  S  S  S  S  S  S  S  S  M  M  T

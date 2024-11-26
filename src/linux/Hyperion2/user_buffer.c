@@ -19,32 +19,22 @@
 #include "hyperion_base.h"
 
 //-------------------------------------------------------------------------------------------
-void
-free_user_buffer( struct hyperion *phyperion,
-                  struct user_buffer_descriptor *puser_buffer_descr )
+void free_user_buffer( struct hyperion* phyperion, struct user_buffer_descriptor* puser_buffer_descr )
 //-------------------------------------------------------------------------------------------
 {
     if( puser_buffer_descr != NULL )
     {
-        remove_user_buffer_descriptor_from_list( phyperion,
-                                                 puser_buffer_descr );
+        remove_user_buffer_descriptor_from_list( phyperion, puser_buffer_descr );
         if( puser_buffer_descr->sg != NULL )
         {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 4, 8, 0 )
-            dma_unmap_sg_attrs( &phyperion->pdev->dev, puser_buffer_descr->sg,
-                                puser_buffer_descr->nr_pages, DMA_FROM_DEVICE,
-                                (long unsigned int)phyperion->pdma_attrs );
+            dma_unmap_sg_attrs( &phyperion->pdev->dev, puser_buffer_descr->sg, puser_buffer_descr->nr_pages, PCI_DMA_FROMDEVICE, ( long unsigned int )phyperion->pdma_attrs );
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 26 )
-            dma_unmap_sg_attrs( &phyperion->pdev->dev, puser_buffer_descr->sg,
-                                puser_buffer_descr->nr_pages,
-                                PCI_DMA_FROMDEVICE,
-                                (struct dma_attrs *)phyperion->pdma_attrs );
+            dma_unmap_sg_attrs( &phyperion->pdev->dev, puser_buffer_descr->sg, puser_buffer_descr->nr_pages, PCI_DMA_FROMDEVICE, ( struct dma_attrs* )phyperion->pdma_attrs );
 #else
-            dma_unmap_sg( &phyperion->pdev->dev, puser_buffer_descr->sg,
-                          puser_buffer_descr->nr_pages, PCI_DMA_FROMDEVICE );
+            dma_unmap_sg( &phyperion->pdev->dev, puser_buffer_descr->sg, puser_buffer_descr->nr_pages, PCI_DMA_FROMDEVICE );
 #endif
-            sgl_unmap_user_pages( puser_buffer_descr->sg,
-                                  puser_buffer_descr->nr_pages, 0 );
+            sgl_unmap_user_pages( puser_buffer_descr->sg, puser_buffer_descr->nr_pages, 0 );
             vfree( puser_buffer_descr->sg );
         }
     }

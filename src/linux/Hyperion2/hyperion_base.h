@@ -168,4 +168,5 @@ int hyperion_copy_to_trailer( struct user_buffer_descriptor* puser_buffer_descr,
 #define ENABLE_HARDWARE_SIGNAL_DEBUGGING_OUT_ON_J6_DBG_BIT 10
 #define HARDWARE_SIGNAL_SELECTOR_MSK 0x300
 
+
 #endif //HyperionH
