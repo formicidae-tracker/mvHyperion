@@ -19,23 +19,35 @@
 #include "hyperion_base.h"
 
 //-------------------------------------------------------------------------------------------
-void complete_request( void* prequest, unsigned char status )
+void
+complete_request( void *prequest, unsigned char status )
 //-------------------------------------------------------------------------------------------
 {
-    struct hyperion_request_packet* phyperion_request_packet = ( struct hyperion_request_packet* )prequest;
+    struct hyperion_request_packet *phyperion_request_packet
+        = (struct hyperion_request_packet *)prequest;
     if( phyperion_request_packet )
     {
-        struct hyperion* phyperion = ( struct hyperion* )phyperion_request_packet->private;
-        //PRINTKM(DMA,(PKTD "%s ioobj %p\n", phyperion->number, __FUNCTION__, phyperion_request_packet ));
+        struct hyperion *phyperion
+            = (struct hyperion *)phyperion_request_packet->private;
+        // PRINTKM(DMA,(PKTD "%s ioobj %p\n", phyperion->number, __FUNCTION__,
+        // phyperion_request_packet ));
         hyperion_release_dma( phyperion_request_packet );
-        free_user_buffer( phyperion, &phyperion_request_packet->user_buffer_descr );
-        free_user_buffer( phyperion, &phyperion_request_packet->trailer_buffer_descr );
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0)
-        aio_complete( phyperion_request_packet->iocb, phyperion_request_packet->count, 0 );
+        free_user_buffer( phyperion,
+                          &phyperion_request_packet->user_buffer_descr );
+        free_user_buffer( phyperion,
+                          &phyperion_request_packet->trailer_buffer_descr );
+#if LINUX_VERSION_CODE < KERNEL_VERSION( 4, 0, 0 )
+        aio_complete( phyperion_request_packet->iocb,
+                      phyperion_request_packet->count, 0 );
+#elif LINUX_VERSION_CODE < KERNEL_VERSION( 5, 16, 0 )
+        phyperion_request_packet->iocb->ki_complete(
+            phyperion_request_packet->iocb, phyperion_request_packet->count,
+            0 );
 #else
-        phyperion_request_packet->iocb->ki_complete( phyperion_request_packet->iocb, phyperion_request_packet->count, 0 );
+        phyperion_request_packet->iocb->ki_complete(
+            phyperion_request_packet->iocb, phyperion_request_packet->count );
 #endif
-        kfree( ( void* )phyperion_request_packet );
+        kfree( (void *)phyperion_request_packet );
     }
 }
 
@@ -431,4 +443,3 @@ unsigned int hyperion_poll( struct file* filp, struct poll_table_struct* wait )
 {
     return 0;
 }
-
