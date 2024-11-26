@@ -298,48 +298,76 @@ int sgl_unmap_user_pages( struct scatterlist* sgl, const unsigned int nr_pages, 
 }
 
 //-------------------------------------------------------------------------------------------
-static int setup_buffering( struct kiocb* iocb, char __user* puser_buffer, size_t count, int is_read, struct user_buffer_descriptor* puser_buffer_descr )
+static int
+setup_buffering( struct kiocb *iocb, char __user *puser_buffer, size_t count,
+                 int is_read,
+                 struct user_buffer_descriptor *puser_buffer_descr )
 //-------------------------------------------------------------------------------------------
 {
-    struct hyperion* phyperion = ( struct hyperion* )iocb->ki_filp->private_data;
+    struct hyperion *phyperion
+        = (struct hyperion *)iocb->ki_filp->private_data;
     int nr_pages;
     unsigned short use_sg;
 
     PRINTKM( MEM, ( PKTD " %s\n", phyperion->number, __FUNCTION__ ) );
     if( puser_buffer_descr != NULL )
     {
-        memset( puser_buffer_descr, 0, sizeof( struct user_buffer_descriptor ) );
+        memset( puser_buffer_descr, 0,
+                sizeof( struct user_buffer_descriptor ) );
         INIT_LIST_HEAD( &puser_buffer_descr->list );
-        use_sg = sgl_get_max_pages( ( UINT_PTR )puser_buffer, count );
-        puser_buffer_descr->sg = vmalloc( use_sg * sizeof( struct scatterlist ) );
+        use_sg = sgl_get_max_pages( (UINT_PTR)puser_buffer, count );
+        puser_buffer_descr->sg
+            = vmalloc( use_sg * sizeof( struct scatterlist ) );
         if( puser_buffer_descr->sg == NULL )
         {
-            PRINTKM( MEM, ( PKTD " %s vmalloc for sglist failed use_sg %d sizeof sg %lx\n", phyperion->number, __FUNCTION__, use_sg, ( long unsigned int )sizeof( struct scatterlist ) ) );
+            PRINTKM(
+                MEM,
+                ( PKTD
+                  " %s vmalloc for sglist failed use_sg %d sizeof sg %lx\n",
+                  phyperion->number, __FUNCTION__, use_sg,
+                  (long unsigned int)sizeof( struct scatterlist ) ) );
             return -ENOMEM;
         }
         puser_buffer_descr->puser_buffer = puser_buffer;
         puser_buffer_descr->count = count;
-        PRINTKM( MEM, ( PKTD " >%s, now fill sg list: sg list elements %d, puser_buffer %p, size %zu\n", phyperion->number, __FUNCTION__, use_sg, ( void* )puser_buffer, count ) );
-        nr_pages = sgl_map_user_pages( puser_buffer_descr->sg, use_sg, ( UINT_PTR )puser_buffer, count, ( is_read ? READ : WRITE ) );
-        PRINTKM( MEM, ( PKTD " %s sgl_map_user_pages(): nr_pages %d phyperion_request_packet->sg p %p\n", phyperion->number, __FUNCTION__, nr_pages, puser_buffer_descr->sg ) );
+        PRINTKM( MEM, ( PKTD " >%s, now fill sg list: sg list elements %d, "
+                             "puser_buffer %p, size %zu\n",
+                        phyperion->number, __FUNCTION__, use_sg,
+                        (void *)puser_buffer, count ) );
+        nr_pages = sgl_map_user_pages( puser_buffer_descr->sg, use_sg,
+                                       (UINT_PTR)puser_buffer, count,
+                                       ( is_read ? READ : WRITE ) );
+        PRINTKM( MEM, ( PKTD " %s sgl_map_user_pages(): nr_pages %d "
+                             "phyperion_request_packet->sg p %p\n",
+                        phyperion->number, __FUNCTION__, nr_pages,
+                        puser_buffer_descr->sg ) );
         if( nr_pages > 0 )
         {
             int dma_map_result = nr_pages, map_result;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION( 4, 8, 0 )
-            map_result = dma_map_sg_attrs( &phyperion->pdev->dev, puser_buffer_descr->sg, nr_pages, PCI_DMA_FROMDEVICE, ( long unsigned int )phyperion->pdma_attrs );
+            map_result = dma_map_sg_attrs(
+                &phyperion->pdev->dev, puser_buffer_descr->sg, nr_pages,
+                DMA_FROM_DEVICE, (long unsigned int)phyperion->pdma_attrs );
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 26 )
-            map_result = dma_map_sg_attrs( &phyperion->pdev->dev, puser_buffer_descr->sg, nr_pages, PCI_DMA_FROMDEVICE, ( struct dma_attrs* )phyperion->pdma_attrs );
+            map_result = dma_map_sg_attrs(
+                &phyperion->pdev->dev, puser_buffer_descr->sg, nr_pages,
+                DMA_FROM_DEVICE, (struct dma_attrs *)phyperion->pdma_attrs );
 #else
-            map_result = dma_map_sg( &phyperion->pdev->dev, puser_buffer_descr->sg, nr_pages, PCI_DMA_FROMDEVICE );
+            map_result
+                = dma_map_sg( &phyperion->pdev->dev, puser_buffer_descr->sg,
+                              nr_pages, PCI_DMA_FROMDEVICE );
 #endif
             if( map_result <= 0 )
             {
-                printk( " %s %d dma_map_sg() failed res %d ubuf %p count %x\n", __FUNCTION__, __LINE__, map_result, puser_buffer, ( unsigned int )count );
+                printk( " %s %d dma_map_sg() failed res %d ubuf %p count %x\n",
+                        __FUNCTION__, __LINE__, map_result, puser_buffer,
+                        (unsigned int)count );
                 dma_map_result = -ENOMEM;
             }
             if( dma_map_result <= 0 )
             {
-                printk( " %s %d dma_map_sg() failed result %d\n", __FUNCTION__, __LINE__, dma_map_result );
+                printk( " %s %d dma_map_sg() failed result %d\n", __FUNCTION__,
+                        __LINE__, dma_map_result );
                 goto error_out_setup_buffering_generic;
             }
             puser_buffer_descr->nr_pages = nr_pages;
