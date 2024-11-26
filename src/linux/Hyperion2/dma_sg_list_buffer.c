@@ -20,8 +20,6 @@
 #include "drivermain.h"
 #include "linux/gfp.h"
 
-int dma_supported( struct device *dev, u64 mask );
-
 //----------------------------------------------------------------------------------------------
 int
 alloc_contiguous_buffer( struct pci_dev *pdev, int size, void **buffer,
@@ -115,7 +113,7 @@ init_sg_buffer_list( struct hyperion *phyperion )
             return result;
         }
 
-        if( dma_supported( &phyperion->pdev->dev, DMA_BIT_MASK( 64 ) ) )
+        if( !dma_set_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 64 ) ) )
         {
             const u64 highPart = DMA_BIT_MASK( 32 ) << 32;
             phyp_dev->dma_sg_list_pool[i].phy

@@ -20,8 +20,6 @@
 #include "drivermain.h"
 #include "hyperion_base.h"
 
-int dma_supported( struct device *dev, u64 mask );
-
 static HYPERION_BASE_REGISTER_DEF CLeRegisterBaseA32[ebrhMax] = {
 #include "hyperion_register_a32.h"
 };
@@ -66,44 +64,65 @@ void restart_trigger_hrtc( struct hyperion_device* phyp_dev, int restart, int hr
 }
 
 //-------------------------------------------------------------------------------------------
-int prepare_scatter_gather_list( struct hyperion_device* phyp_dev, struct hyperion_request_packet* phyperion_request_packet )
+int
+prepare_scatter_gather_list(
+    struct hyperion_device *phyp_dev,
+    struct hyperion_request_packet *phyperion_request_packet )
 //-------------------------------------------------------------------------------------------
 {
     volatile dma_addr_t address;
     int xfer, page_length;
-    struct dma_sg_list_entry* list_entry = ( struct dma_sg_list_entry* )phyperion_request_packet->dma_list_entry;
-    u64* psg_list_hyperion_dma_buffer = ( u64* )( list_entry->buf );
+    struct dma_sg_list_entry *list_entry
+        = (struct dma_sg_list_entry *)phyperion_request_packet->dma_list_entry;
+    u64 *psg_list_hyperion_dma_buffer = (u64 *)( list_entry->buf );
     unsigned long index_sg_list_entry = 0;
-    struct user_buffer_descriptor* puser_buffer_descr = &phyperion_request_packet->user_buffer_descr;
+    struct user_buffer_descriptor *puser_buffer_descr
+        = &phyperion_request_packet->user_buffer_descr;
 
-    xfer = ( int )phyperion_request_packet->parameters.transferlength;
-    //PRINTKM(DMA,(PKTD "prep_sg_list() dto p%p xfer 0x%x isg %u max_e %lu\n", phyp_dev->number, dto, xfer, itt ));
+    xfer = (int)phyperion_request_packet->parameters.transferlength;
+    // PRINTKM(DMA,(PKTD "prep_sg_list() dto p%p xfer 0x%x isg %u max_e %lu\n",
+    // phyp_dev->number, dto, xfer, itt ));
     xfer -= puser_buffer_descr->sg[0].offset;
-    //PRINTKM(DMA,(PKTD "xfer 0x%x offset 0x%x\n", phyp_dev->number, xfer, *offset ));
+    // PRINTKM(DMA,(PKTD "xfer 0x%x offset 0x%x\n", phyp_dev->number, xfer,
+    // *offset ));
 
     if( phyp_dev->pci_hyperion_page_size != PAGE_SIZE )
     {
         while( xfer > 0 && index_sg_list_entry < puser_buffer_descr->nr_pages )
         {
-            //PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
-            address = sg_dma_address( &puser_buffer_descr->sg[index_sg_list_entry] ) & ~3;
-            if( dma_supported( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
+            // PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer
+            // 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
+            address = sg_dma_address(
+                          &puser_buffer_descr->sg[index_sg_list_entry] )
+                      & ~3;
+            if( !dma_set_mask( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
             {
                 const u64 highPart = DMA_BIT_MASK( 32 ) << 32;
-                address |= ( address & highPart ) ? phyp_dev->address_space_encoding : 0;
+                address |= ( address & highPart )
+                               ? phyp_dev->address_space_encoding
+                               : 0;
             }
 
-            page_length = ( int )( puser_buffer_descr->sg[index_sg_list_entry].length );
+            page_length
+                = (int)( puser_buffer_descr->sg[index_sg_list_entry].length );
             while( page_length > 0 )
             {
-                *psg_list_hyperion_dma_buffer = cpu_to_le64( ( u64 )address );
-                //PRINTKM(DMA,(PKTD " %s: xfer 0x%x itranslationtable %d translationtable %p addr 0x%llx len 0x%x\n", phyp_dev->number, __FUNCTION__, xfer, itt, &translation_table[itt], address, page_length ));
-                //PRINTKM(DMA,(PKTD " %s: xfer 0x%x sg_list[%d] addr 0x%llx  0x%llx len 0x%x\n", phyp_dev->number, __FUNCTION__, xfer, index_sg_list_entry, *psg_list_hyperion_dma_buffer, address, sg_dma_len(&phyperion_request_packet->sg[index_sg_list_entry]) ));
+                *psg_list_hyperion_dma_buffer = cpu_to_le64( (u64)address );
+                // PRINTKM(DMA,(PKTD " %s: xfer 0x%x itranslationtable %d
+                // translationtable %p addr 0x%llx len 0x%x\n",
+                // phyp_dev->number, __FUNCTION__, xfer, itt,
+                // &translation_table[itt], address, page_length ));
+                // PRINTKM(DMA,(PKTD " %s: xfer 0x%x sg_list[%d] addr 0x%llx
+                // 0x%llx len 0x%x\n", phyp_dev->number, __FUNCTION__, xfer,
+                // index_sg_list_entry, *psg_list_hyperion_dma_buffer, address,
+                // sg_dma_len(&phyperion_request_packet->sg[index_sg_list_entry])
+                // ));
                 page_length -= phyp_dev->pci_hyperion_page_size;
                 address += phyp_dev->pci_hyperion_page_size;
                 ++psg_list_hyperion_dma_buffer;
             }
-            xfer -= ( int )( puser_buffer_descr->sg[index_sg_list_entry].length );
+            xfer
+                -= (int)( puser_buffer_descr->sg[index_sg_list_entry].length );
             ++index_sg_list_entry;
         }
     }
@@ -111,21 +130,32 @@ int prepare_scatter_gather_list( struct hyperion_device* phyp_dev, struct hyperi
     {
         while( xfer > 0 && index_sg_list_entry < puser_buffer_descr->nr_pages )
         {
-            //PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
-            address = sg_dma_address( &puser_buffer_descr->sg[index_sg_list_entry] ) & ~3;
-            if( dma_supported( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
+            // PRINTKM(DMA,(PKTD " ScatterGatherList next element %d xfer
+            // 0x%x\n", phyp_dev->number, index_sg_list_entry, xfer ));
+            address = sg_dma_address(
+                          &puser_buffer_descr->sg[index_sg_list_entry] )
+                      & ~3;
+            if( !dma_set_mask( &phyp_dev->pdev->dev, DMA_BIT_MASK( 64 ) ) )
             {
                 const u64 highPart = DMA_BIT_MASK( 32 ) << 32;
-                address |= ( address & highPart ) ? phyp_dev->address_space_encoding : 0;
+                address |= ( address & highPart )
+                               ? phyp_dev->address_space_encoding
+                               : 0;
             }
-            *psg_list_hyperion_dma_buffer = cpu_to_le64( ( u64 )address );
-            //PRINTKM(DMA,(PKTD " %s: [%d] xfer 0x%x addr 0x%x len 0x%x\n", phyp_dev->number, __FUNCTION__, index_sg_list_entry, xfer, *psg_list_hyperion_dma_buffer, phyperion_request_packet->sg[index_sg_list_entry].length ));
-            xfer -= ( int )( puser_buffer_descr->sg[index_sg_list_entry].length );
+            *psg_list_hyperion_dma_buffer = cpu_to_le64( (u64)address );
+            // PRINTKM(DMA,(PKTD " %s: [%d] xfer 0x%x addr 0x%x len 0x%x\n",
+            // phyp_dev->number, __FUNCTION__, index_sg_list_entry, xfer,
+            // *psg_list_hyperion_dma_buffer,
+            // phyperion_request_packet->sg[index_sg_list_entry].length ));
+            xfer
+                -= (int)( puser_buffer_descr->sg[index_sg_list_entry].length );
             ++index_sg_list_entry;
             ++psg_list_hyperion_dma_buffer;
         }
     }
-    //PRINTKM(DMA,(PKTD " prepare_scatter_gather_list() page_off 0x%lx index_sg_list_entry %ld\n", phyp_dev->number, PAGE_SIZE + xfer, index_sg_list_entry ));
+    // PRINTKM(DMA,(PKTD " prepare_scatter_gather_list() page_off 0x%lx
+    // index_sg_list_entry %ld\n", phyp_dev->number, PAGE_SIZE + xfer,
+    // index_sg_list_entry ));
     return dcecNoError;
 }
 
