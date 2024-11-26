@@ -42,10 +42,12 @@ void free_contiguous_buffer( struct pci_dev* pdev, int size, void* buffer, dma_a
 }
 
 //----------------------------------------------------------------------------------------------
-int init_sg_buffer_list( struct hyperion* phyperion )
+int
+init_sg_buffer_list( struct hyperion *phyperion )
 //----------------------------------------------------------------------------------------------
 {
-    struct hyperion_device* phyp_dev = ( struct hyperion_device* )phyperion->device;
+    struct hyperion_device *phyp_dev
+        = (struct hyperion_device *)phyperion->device;
     int i, result = -ENOMEM;
 
     INIT_LIST_HEAD( &phyp_dev->dma_sg_list.head );
@@ -55,9 +57,13 @@ int init_sg_buffer_list( struct hyperion* phyperion )
     {
         phyp_dev->dma_sg_list_pool[i].index = i;
         phyp_dev->dma_sg_list_pool[i].buf_size = ( 512 * 1024 );
-        list_add_tail( &phyp_dev->dma_sg_list_pool[i].list_entry, &phyp_dev->dma_sg_list.head );
-//alloc buffer for sg_dma_address
-        result = alloc_contiguous_buffer( phyperion->pdev, phyp_dev->dma_sg_list_pool[i].buf_size, &phyp_dev->dma_sg_list_pool[i].buf, &phyp_dev->dma_sg_list_pool[i].phy, PCI_DMA_TODEVICE );
+        list_add_tail( &phyp_dev->dma_sg_list_pool[i].list_entry,
+                       &phyp_dev->dma_sg_list.head );
+        // alloc buffer for sg_dma_address
+        result = alloc_contiguous_buffer(
+            phyperion->pdev, phyp_dev->dma_sg_list_pool[i].buf_size,
+            &phyp_dev->dma_sg_list_pool[i].buf,
+            &phyp_dev->dma_sg_list_pool[i].phy, DMA_TO_DEVICE );
         if( result < 0 )
         {
             return result;
@@ -66,8 +72,11 @@ int init_sg_buffer_list( struct hyperion* phyperion )
         {
             phyp_dev->dma_sg_list_pool[i].size = result;
         }
-//alloc buffer for communication host - hyperion processor
-        result = alloc_contiguous_buffer( phyperion->pdev, PAGE_SIZE, &phyp_dev->dma_sg_list_pool[i].nios_msg, &phyp_dev->dma_sg_list_pool[i].nios_msg_phy, PCI_DMA_TODEVICE );
+        // alloc buffer for communication host - hyperion processor
+        result = alloc_contiguous_buffer(
+            phyperion->pdev, PAGE_SIZE,
+            &phyp_dev->dma_sg_list_pool[i].nios_msg,
+            &phyp_dev->dma_sg_list_pool[i].nios_msg_phy, DMA_TO_DEVICE );
         if( result < 0 )
         {
             return result;
@@ -77,8 +86,11 @@ int init_sg_buffer_list( struct hyperion* phyperion )
             phyp_dev->dma_sg_list_pool[i].nios_msg_size = result;
         }
 
-//alloc buffer for communication hyperion processor - host
-        result = alloc_contiguous_buffer( phyperion->pdev, PAGE_SIZE, &phyp_dev->dma_sg_list_pool[i].host_msg, &phyp_dev->dma_sg_list_pool[i].host_msg_phy, PCI_DMA_FROMDEVICE );
+        // alloc buffer for communication hyperion processor - host
+        result = alloc_contiguous_buffer(
+            phyperion->pdev, PAGE_SIZE,
+            &phyp_dev->dma_sg_list_pool[i].host_msg,
+            &phyp_dev->dma_sg_list_pool[i].host_msg_phy, DMA_FROM_DEVICE );
         if( result < 0 )
         {
             return result;
@@ -87,8 +99,11 @@ int init_sg_buffer_list( struct hyperion* phyperion )
         {
             phyp_dev->dma_sg_list_pool[i].host_msg_size = result;
         }
-//alloc buffer for request_extension
-        result = alloc_contiguous_buffer( phyperion->pdev, PAGE_SIZE, &phyp_dev->dma_sg_list_pool[i].request_extension, &phyp_dev->dma_sg_list_pool[i].req_ext_phy, PCI_DMA_BIDIRECTIONAL );
+        // alloc buffer for request_extension
+        result = alloc_contiguous_buffer(
+            phyperion->pdev, PAGE_SIZE,
+            &phyp_dev->dma_sg_list_pool[i].request_extension,
+            &phyp_dev->dma_sg_list_pool[i].req_ext_phy, DMA_BIDIRECTIONAL );
         if( result < 0 )
         {
             return result;
@@ -97,36 +112,68 @@ int init_sg_buffer_list( struct hyperion* phyperion )
         if( dma_supported( &phyperion->pdev->dev, DMA_BIT_MASK( 64 ) ) )
         {
             const u64 highPart = DMA_BIT_MASK( 32 ) << 32;
-            phyp_dev->dma_sg_list_pool[i].phy |= ( phyp_dev->dma_sg_list_pool[i].phy & highPart ) ? phyp_dev->address_space_encoding : 0 ;
-            phyp_dev->dma_sg_list_pool[i].nios_msg_phy |= ( phyp_dev->dma_sg_list_pool[i].nios_msg_phy & highPart ) ? phyp_dev->address_space_encoding : 0;
-            phyp_dev->dma_sg_list_pool[i].host_msg_phy |= ( phyp_dev->dma_sg_list_pool[i].host_msg_phy & highPart ) ? phyp_dev->address_space_encoding : 0;
-            phyp_dev->dma_sg_list_pool[i].req_ext_phy |= ( phyp_dev->dma_sg_list_pool[i].req_ext_phy & highPart ) ? phyp_dev->address_space_encoding : 0;
+            phyp_dev->dma_sg_list_pool[i].phy
+                |= ( phyp_dev->dma_sg_list_pool[i].phy & highPart )
+                       ? phyp_dev->address_space_encoding
+                       : 0;
+            phyp_dev->dma_sg_list_pool[i].nios_msg_phy
+                |= ( phyp_dev->dma_sg_list_pool[i].nios_msg_phy & highPart )
+                       ? phyp_dev->address_space_encoding
+                       : 0;
+            phyp_dev->dma_sg_list_pool[i].host_msg_phy
+                |= ( phyp_dev->dma_sg_list_pool[i].host_msg_phy & highPart )
+                       ? phyp_dev->address_space_encoding
+                       : 0;
+            phyp_dev->dma_sg_list_pool[i].req_ext_phy
+                |= ( phyp_dev->dma_sg_list_pool[i].req_ext_phy & highPart )
+                       ? phyp_dev->address_space_encoding
+                       : 0;
         }
 
-        PRINTKM( DMA, ( PKTD ": - %s - " "[%d] nios_msg %p phy %p host_msg %p phy %p sg_list_dma_addr %p phy %p\n", phyperion->number, __FUNCTION__, i,
-                        phyp_dev->dma_sg_list_pool[i].nios_msg, ( void* )( ( UINT_PTR )phyp_dev->dma_sg_list_pool[i].nios_msg_phy ),
-                        phyp_dev->dma_sg_list_pool[i].host_msg, ( void* )( ( UINT_PTR )phyp_dev->dma_sg_list_pool[i].host_msg_phy ),
-                        phyp_dev->dma_sg_list_pool[i].buf, ( void* )( ( UINT_PTR )phyp_dev->dma_sg_list_pool[i].phy ) ) );
+        PRINTKM(
+            DMA,
+            ( PKTD ": - %s - "
+                   "[%d] nios_msg %p phy %p host_msg %p phy %p "
+                   "sg_list_dma_addr %p phy %p\n",
+              phyperion->number, __FUNCTION__, i,
+              phyp_dev->dma_sg_list_pool[i].nios_msg,
+              (void *)( (UINT_PTR)phyp_dev->dma_sg_list_pool[i].nios_msg_phy ),
+              phyp_dev->dma_sg_list_pool[i].host_msg,
+              (void *)( (UINT_PTR)phyp_dev->dma_sg_list_pool[i].host_msg_phy ),
+              phyp_dev->dma_sg_list_pool[i].buf,
+              (void *)( (UINT_PTR)phyp_dev->dma_sg_list_pool[i].phy ) ) );
     }
     return 0;
 }
 
 //----------------------------------------------------------------------------------------------
-void release_sg_buffer_list( struct hyperion* phyperion )
+void
+release_sg_buffer_list( struct hyperion *phyperion )
 //----------------------------------------------------------------------------------------------
 {
-    struct hyperion_device* phyp_dev = ( struct hyperion_device* )phyperion->device;
+    struct hyperion_device *phyp_dev
+        = (struct hyperion_device *)phyperion->device;
     int i;
     for( i = 0; i < MAX_COUNT_REQUEST_OBJECT; i++ )
     {
         list_del( &phyp_dev->dma_sg_list_pool[i].list_entry );
-        free_contiguous_buffer( phyperion->pdev, phyp_dev->dma_sg_list_pool[i].buf_size, phyp_dev->dma_sg_list_pool[i].buf, phyp_dev->dma_sg_list_pool[i].phy, PCI_DMA_FROMDEVICE );
+        free_contiguous_buffer(
+            phyperion->pdev, phyp_dev->dma_sg_list_pool[i].buf_size,
+            phyp_dev->dma_sg_list_pool[i].buf,
+            phyp_dev->dma_sg_list_pool[i].phy, DMA_FROM_DEVICE );
 
-        free_contiguous_buffer( phyperion->pdev, PAGE_SIZE, phyp_dev->dma_sg_list_pool[i].nios_msg, phyp_dev->dma_sg_list_pool[i].nios_msg_phy, PCI_DMA_FROMDEVICE );
+        free_contiguous_buffer(
+            phyperion->pdev, PAGE_SIZE, phyp_dev->dma_sg_list_pool[i].nios_msg,
+            phyp_dev->dma_sg_list_pool[i].nios_msg_phy, DMA_FROM_DEVICE );
 
-        free_contiguous_buffer( phyperion->pdev, PAGE_SIZE, phyp_dev->dma_sg_list_pool[i].host_msg, phyp_dev->dma_sg_list_pool[i].host_msg_phy, PCI_DMA_FROMDEVICE );
+        free_contiguous_buffer(
+            phyperion->pdev, PAGE_SIZE, phyp_dev->dma_sg_list_pool[i].host_msg,
+            phyp_dev->dma_sg_list_pool[i].host_msg_phy, DMA_FROM_DEVICE );
 
-        free_contiguous_buffer( phyperion->pdev, PAGE_SIZE, phyp_dev->dma_sg_list_pool[i].request_extension, phyp_dev->dma_sg_list_pool[i].req_ext_phy, PCI_DMA_FROMDEVICE );
+        free_contiguous_buffer(
+            phyperion->pdev, PAGE_SIZE,
+            phyp_dev->dma_sg_list_pool[i].request_extension,
+            phyp_dev->dma_sg_list_pool[i].req_ext_phy, DMA_FROM_DEVICE );
     }
 }
 
