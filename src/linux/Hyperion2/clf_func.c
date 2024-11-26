@@ -15,13 +15,14 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drivermain.h"
-#include "hyperion_base.h"
 #include "clf_func.h"
 #include "dma_sg_list_buffer.h"
+#include "drivermain.h"
+#include "hyperion_base.h"
 
-static HYPERION_BASE_REGISTER_DEF CLeRegisterBaseA32[ebrhMax] =
-{
+int dma_supported( struct device *dev, u64 mask );
+
+static HYPERION_BASE_REGISTER_DEF CLeRegisterBaseA32[ebrhMax] = {
 #include "hyperion_register_a32.h"
 };
 
@@ -1010,4 +1011,3 @@ void hyperion_func_camera_power( struct hyperion* phyperion, int state )
     }
 
 }
-

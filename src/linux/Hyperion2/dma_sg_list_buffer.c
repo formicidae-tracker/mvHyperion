@@ -1,5 +1,6 @@
 /*
- * dma_sg_list_buffer.c  -- MATRIX VISION Frame Grabber Driver for mvHyperion series.
+ * dma_sg_list_buffer.c  -- MATRIX VISION Frame Grabber Driver for mvHyperion
+ series.
  *
  *   Copyright (c) 2006 MATRIX VISION GmbH (info@matrix-vision.de)
  *
@@ -15,19 +16,24 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drivermain.h"
 #include "clf_func.h"
+#include "drivermain.h"
 #include "linux/gfp.h"
 
+int dma_supported( struct device *dev, u64 mask );
 
 //----------------------------------------------------------------------------------------------
-int alloc_contiguous_buffer( struct pci_dev* pdev, int size, void** buffer, dma_addr_t* phys_addr, int direction )
+int
+alloc_contiguous_buffer( struct pci_dev *pdev, int size, void **buffer,
+                         dma_addr_t *phys_addr, int direction )
 //----------------------------------------------------------------------------------------------
 {
     *buffer = dma_alloc_coherent( &pdev->dev, size, phys_addr, GFP_KERNEL );
     if( *buffer == NULL )
     {
-        printk( KERN_ERR "hyperion2 %s couldn't allocate sg_buffer_pool size %d\n", __FUNCTION__, size );
+        printk( KERN_ERR
+                "hyperion2 %s couldn't allocate sg_buffer_pool size %d\n",
+                __FUNCTION__, size );
         return -ENOMEM;
     }
     memset( *buffer, 0, size );
