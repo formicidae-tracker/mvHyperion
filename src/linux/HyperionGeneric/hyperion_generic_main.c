@@ -189,53 +189,59 @@ hyperion_serial_class_device_destroy( dev_t dev_num )
 }
 EXPORT_SYMBOL( hyperion_serial_class_device_destroy );
 
-//-------------------------------------------------------------------------------------------
-static int __init
-hyperion_generic_init( void )
-//-------------------------------------------------------------------------------------------
-{
-    int i, result = 0;
-    // printk( " %s\n", __FUNCTION__ );
+ static int chrdev = -1;
 
-    int res = register_chrdev( 240, "hyperion_generic", &fops );
-    if( res != 0 )
-    {
-        printk( KERN_ERR "could not register hyperion as char dev 240: %d\n",
-                res );
-        return -EIO;
-    }
+//-------------------------------------------------------------------------------------------
+ static int __init
+ hyperion_generic_init( void )
+ //-------------------------------------------------------------------------------------------
+ {
+     int i, result = 0;
+     // printk( " %s\n", __FUNCTION__ );
 
-    /* create sysfs class for hyperion */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,4,0)
-    hyperion_class = class_create( "hyperion" );
+     chrdev = register_chrdev( 0, "hyperion_generic", &fops );
+     if( chrdev < 0 )
+     {
+         printk( KERN_ERR "could not register hyperion as char dev 240: %d\n",
+                 chrdev );
+         return -EIO;
+     }
+
+     /* create sysfs class for hyperion */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION( 6, 4, 0 )
+     hyperion_class = class_create( "hyperion" );
 #else
-    hyperion_class = class_create( THIS_MODULE, "hyperion" );
+     hyperion_class = class_create( THIS_MODULE, "hyperion" );
 #endif
-    if( IS_ERR( hyperion_class ) && PTR_ERR( hyperion_class ) != -EEXIST )
-    {
-        /* tidy up after error */
-        result = PTR_ERR( hyperion_class );
-        printk( " %s error %d\n", __FUNCTION__, result );
-        class_destroy( hyperion_class );
-        unregister_chrdev( 240, "hyperion_generic" );
-        return result;
-    }
+     if( IS_ERR( hyperion_class ) && PTR_ERR( hyperion_class ) != -EEXIST )
+     {
+         /* tidy up after error */
+         result = PTR_ERR( hyperion_class );
+         printk( " %s error %d\n", __FUNCTION__, result );
+         class_destroy( hyperion_class );
+         unregister_chrdev( chrdev, "hyperion_generic" );
+         return result;
+     }
 
-    for( i = 0; i < MAX_DEVICE; i++ )
-    {
-        device_map[i].index = i;
-        device_map[i].used = 0;
-    }
+     for( i = 0; i < MAX_DEVICE; i++ )
+     {
+         device_map[i].index = i;
+         device_map[i].used = 0;
+     }
 
-    return 0;
-}
+     return 0;
+ }
 
 //-------------------------------------------------------------------------------------------
-static void __exit hyperion_generic_exit( void )
+static void __exit
+hyperion_generic_exit( void )
 //-------------------------------------------------------------------------------------------
 {
-    //printk( " %s\n", __FUNCTION__ );
-    unregister_chrdev( 240, "hyperion_generic" );
+    // printk( " %s\n", __FUNCTION__ );
+    if( chrdev > 0 )
+    {
+        unregister_chrdev( chrdev, "hyperion_generic" );
+    }
     class_destroy( hyperion_class );
 }
 
