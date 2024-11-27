@@ -970,6 +970,7 @@ int
 query_processor_system_infos( struct hyperion_device *phyp_dev )
 //-------------------------------------------------------------------------------------------
 {
+    printk( KERN_INFO "query processor in atomic %d\n", in_atomic() );
     int result = 0;
     unsigned long cpu_clk_hz, message = MESSAGE_TYPE_SYSTEM_INFO;
     message |= QUERY_CPU_CLK_HZ;
@@ -1063,6 +1064,7 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
 {
     unsigned long irqflags;
     int wait, result = -ENODATA;
+    printk( KERN_ERR "transmit_message in atomic: %d\n", in_atomic() );
     spin_lock_irqsave( &phyp_dev->ioctl_lock.s_message, irqflags );
     if( buffer != NULL && size > 0
         && size <= SIZE_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS )
@@ -1077,17 +1079,19 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
                  OFF_P2A_MAILBOX0, message );
 
     wait = msecs_to_jiffies( timeout_msec );
-    bool once = true;
+    bool once = false;
+    printk( KERN_ERR "now transmit_message in atomic: %d\n", in_atomic() );
     while( wait > 0 )
     {
         if( in_atomic() )
         {
             if( once == true )
             {
+                once = false;
                 printk(
                     KERN_ERR
                     "WUT what did you just do, scheduling in an atomic???\n" );
-                once = false;
+                dump_stack();
             }
         }
         else

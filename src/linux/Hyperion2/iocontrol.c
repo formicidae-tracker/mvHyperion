@@ -35,35 +35,45 @@ struct mv_ioctl
 #define IOBUFFER_TO(type) (type)(io_buffer+sizeof(struct mv_ioctl))
 //-------------------------------------------------------------------------------------------
 #if HAVE_UNLOCKED_IOCTL
-long hyperion_ioctl( struct file* file, unsigned int cmd, unsigned long arg )
+long
+hyperion_ioctl( struct file *file, unsigned int cmd, unsigned long arg )
 #else
-int hyperion_ioctl( struct inode* inode, struct file* file, unsigned int cmd, unsigned long arg )
+int
+hyperion_ioctl( struct inode *inode, struct file *file, unsigned int cmd,
+                unsigned long arg )
 #endif
 //-------------------------------------------------------------------------------------------
 {
-    struct hyperion* phyperion = ( struct hyperion* )file->private_data;
-    struct hyperion_device* phyp_dev = ( struct hyperion_device* )phyperion->device;
+
+    struct hyperion *phyperion = (struct hyperion *)file->private_data;
+    struct hyperion_device *phyp_dev
+        = (struct hyperion_device *)phyperion->device;
     int error = 0;
-    TUserVirtualAddress uva ;
+    TUserVirtualAddress uva;
     u_short dir = _IOC_DIR( cmd );
     u_short size = _IOC_SIZE( cmd );
     struct mv_ioctl mvio;
-    char* io_buffer;
+    char *io_buffer;
     unsigned long io_buffer_size;
     unsigned char write_back_to_user = FALSE;
     uva.uptr = arg;
-    PRINTKM( IOCTL, ( PKTD "ioctl cmd=0x%08x, dir=%d, size=%d, arg=0x%08lx\n", phyperion->number, cmd, dir, size, arg ) );
+    PRINTKM( IOCTL,
+             ( PKTD
+               "ioctl cmd=0x%08x, dir=%d, size=%d, arg=0x%08lx atomic=%d\n",
+               phyperion->number, cmd, dir, size, arg, in_atomic() ) );
 
     read_user( uva, &mvio, sizeof( mvio ) );
     io_buffer_size = max( mvio.in_size, mvio.out_size ) + sizeof( mvio );
     io_buffer = kmalloc( io_buffer_size, GFP_KERNEL );
     if( io_buffer == NULL )
     {
-        PRINTKM( IOCTL, ( PKTD "ioctl cmd 0x%08x can't allocate io_buffer\n", phyperion->number, cmd ) );
+        PRINTKM( IOCTL, ( PKTD "ioctl cmd 0x%08x can't allocate io_buffer\n",
+                          phyperion->number, cmd ) );
         return -EINVAL;
     }
     read_user( uva, io_buffer, io_buffer_size );
-    PRINTKM( IOCTL, ( PKTD "ioctl cmd 0x%08x  insize %d osize %d\n", phyperion->number, cmd, mvio.in_size, mvio.out_size ) );
+    PRINTKM( IOCTL, ( PKTD "ioctl cmd 0x%08x  insize %d osize %d\n",
+                      phyperion->number, cmd, mvio.in_size, mvio.out_size ) );
 
     if( phyp_dev->user_flash_enabled == FALSE )
     {
@@ -71,29 +81,29 @@ int hyperion_ioctl( struct inode* inode, struct file* file, unsigned int cmd, un
         {
         case IOCTL_READ_ASMI_U32:
         case IOCTL_WRITE_ASMI_U32:
-            //switch to IOCTL code defined in CommonIoCtl.h
+            // switch to IOCTL code defined in CommonIoCtl.h
             break;
         default:
-            cmd = -1; //remove this IOCTL with status = STATUS_INVALID_DEVICE_REQUEST
+            cmd = -1; // remove this IOCTL with status =
+                      // STATUS_INVALID_DEVICE_REQUEST
             break;
         }
     }
 
     switch( cmd )
     {
-#include "serialport_ioctl.h"
 #include "clf_ioctl.h"
 #include "common_ioctl.h"
+#include "serialport_ioctl.h"
     }
     if( write_back_to_user )
     {
-        write_user_buffer( ( void* )io_buffer, uva, io_buffer_size );
+        write_user_buffer( (void *)io_buffer, uva, io_buffer_size );
     }
     kfree( io_buffer );
 #if HAVE_UNLOCKED_IOCTL
-    return ( long )error;
+    return (long)error;
 #else
     return error;
 #endif
 }
-
