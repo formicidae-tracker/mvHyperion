@@ -328,7 +328,6 @@ void
 hyperion_do_tasklet( unsigned long index )
 //-------------------------------------------------------------------------------------------
 {
-    printk( KERN_INFO "tasklet is here\n" );
     struct hyperion *phyperion = get_hyperion( index );
     struct hyperion_device *phyp_dev
         = (struct hyperion_device *)phyperion->device;
@@ -352,8 +351,6 @@ hyperion_do_tasklet( unsigned long index )
         // isr_result.status );
         if( isr_result.status & A2P_MAILBOX_INT0 )
         {
-            printk( KERN_INFO "tasklet is signaling\n" );
-
             signal_sema( phyp_dev->sema_message_received, 1 );
         }
 
@@ -1078,21 +1075,32 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
     reset_sema( phyp_dev->sema_message_received );
     IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhPCICore,
                  OFF_P2A_MAILBOX0, message );
+
     wait = msecs_to_jiffies( timeout_msec );
-    unsigned long start = jiffies;
-    printk( "current jiffies is timeout=%dms jiffies=%d %u\n", timeout_msec,
-            wait, start );
+    bool once = true;
     while( wait > 0 )
     {
-        // wait_jiffies( 1 );
-        result = wait_sema( phyp_dev->sema_message_received, 1 );
+        if( in_atomic() )
+        {
+            if( once == true )
+            {
+                printk(
+                    KERN_ERR
+                    "WUT what did you just do, scheduling in an atomic???\n" );
+                once = false;
+            }
+        }
+        else
+        {
+            wait_jiffies( 1 );
+        }
+        result = wait_sema( phyp_dev->sema_message_received, 2 );
         if( result == ObjSignaled )
         {
             break;
         }
         --wait;
     }
-    printk( "final jiffies is %u\n", jiffies - start );
     if( result == ObjSignaled )
     {
         if( processor_result != NULL )

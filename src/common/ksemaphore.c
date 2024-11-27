@@ -264,7 +264,8 @@ void handle_timeout( void )
 
 
 /* ----------------------------------------------------------------------- */
-int wait_sema( TKSemaphore* sem, int timeoutmsec )
+int
+wait_sema( TKSemaphore *sem, int timeoutmsec )
 {
     if( sem )
     {
@@ -276,8 +277,11 @@ int wait_sema( TKSemaphore* sem, int timeoutmsec )
         timeout.QuadPart *= timeoutmsec;
 
         //_MV_Print (("+wait semaphore, timeoutmsec %d\n", timeoutmsec));
-        //status = KeWaitForSingleObject (sem->KSem, Executive, KernelMode, TRUE, (timeoutmsec == INFINITE ? NULL : &timeout) );
-        status = KeWaitForSingleObject( sem->KSem, UserRequest, UserMode, TRUE, ( timeoutmsec == INFINITE ? NULL : &timeout ) );
+        // status = KeWaitForSingleObject (sem->KSem, Executive, KernelMode,
+        // TRUE, (timeoutmsec == INFINITE ? NULL : &timeout) );
+        status = KeWaitForSingleObject(
+            sem->KSem, UserRequest, UserMode, TRUE,
+            ( timeoutmsec == INFINITE ? NULL : &timeout ) );
         sem->ReleaseError = STATUS_SUCCESS;
         if( sem->sema_count > 0 )
         {
@@ -293,7 +297,6 @@ int wait_sema( TKSemaphore* sem, int timeoutmsec )
         case STATUS_ALERTED:
         default:
             return ObjError;
-
         }
 #elifdef WIN95
         HTIMEOUT htimeout = NULL;
@@ -303,7 +306,8 @@ int wait_sema( TKSemaphore* sem, int timeoutmsec )
         {
             if( timeoutmsec != INFINITE )
             {
-                htimeout = KSemaSet_Async_Time_Out( handle_timeout, timeoutmsec, ( ULONG )sem );
+                htimeout = KSemaSet_Async_Time_Out( handle_timeout,
+                                                    timeoutmsec, (ULONG)sem );
             }
 
             Wait_Semaphore( sem->KSem, BLOCK_SVC_INTS | BLOCK_THREAD_IDLE );
@@ -317,7 +321,8 @@ int wait_sema( TKSemaphore* sem, int timeoutmsec )
         {
             if( sem->sema_count > 0 )
             {
-                Wait_Semaphore( sem->KSem, BLOCK_SVC_INTS | BLOCK_THREAD_IDLE );
+                Wait_Semaphore( sem->KSem,
+                                BLOCK_SVC_INTS | BLOCK_THREAD_IDLE );
                 sem->sema_count--;
             }
             else
@@ -325,25 +330,29 @@ int wait_sema( TKSemaphore* sem, int timeoutmsec )
                 sem->Status = ObjTimeout;
             }
         }
-        //_MV_Print (("SYS: wait_sema %d st %d\n", sem->sema_count, sem->Status));
+        //_MV_Print (("SYS: wait_sema %d st %d\n", sem->sema_count,
+        // sem->Status));
         return sem->Status;
 
 #else /* linux */
         if( sem && sem->Magic == SEM_MAGIC )
         {
-            unsigned long waitjiffies ;
+            unsigned long waitjiffies;
             waitjiffies = msecs_to_jiffies( timeoutmsec );
             if( sem->sema_count > 0 )
             {
                 sem->sema_count--;
             }
 
-            //down_interruptible ( &sem->KSem ) ;
+            // down_interruptible ( &sem->KSem ) ;
             if( timeoutmsec > 0 )
-#if LINUX_VERSION_CODE >= KERNEL_VERSION (2,6,26)
-                wait_event_interruptible_timeout( sem->queue, ( &sem->KSem.count > 0 ), waitjiffies );
+#if LINUX_VERSION_CODE >= KERNEL_VERSION( 2, 6, 26 )
+                wait_event_interruptible_timeout(
+                    sem->queue, ( &sem->KSem.count > 0 ), waitjiffies );
 #else
-                wait_event_interruptible_timeout( sem->queue, ( atomic_read( &sem->KSem.count ) > 0 ), waitjiffies );
+                wait_event_interruptible_timeout(
+                    sem->queue, ( atomic_read( &sem->KSem.count ) > 0 ),
+                    waitjiffies );
 #endif
             if( down_trylock( &sem->KSem ) == 0 )
             {
@@ -356,14 +365,14 @@ int wait_sema( TKSemaphore* sem, int timeoutmsec )
         }
         else
         {
-            return ObjError ;
+            return ObjError;
         }
 #endif /* linux */
     }
     else
     {
         //_MV_Print (("wait semaphore () sem p%p\n", sem));
-        return -1 ;
+        return -1;
     }
 }
 

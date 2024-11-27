@@ -165,15 +165,15 @@ int write_user_buffer( const void* ptr, TUserVirtualAddress uva, u_int size )
  * TODO kernel 2.6.x consider using jiffies_64 ??
  */
 //-----------------------------------------------------------------------------
-void wait_jiffies( u_long waitJiffies )
+void
+wait_jiffies( u_long waitJiffies )
 //-----------------------------------------------------------------------------
 {
     u_long endJiffies = jiffies + waitJiffies;
     do
     {
         schedule();
-    }
-    while( time_before( jiffies, endJiffies ) );
+    } while( time_before( jiffies, endJiffies ) );
 }
 
 //-----------------------------------------------------------------------------
