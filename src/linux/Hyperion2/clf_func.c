@@ -806,11 +806,11 @@ hyperion_func_init( struct hyperion *phyperion, unsigned long control )
     memset( phyp_dev, 0, sizeof( struct hyperion_device ) );
     phyperion->device = (void *)phyp_dev;
     phyp_dev->number = phyperion->number;
-    spin_lock_init( &phyp_dev->ioctl_lock.s_message );
+    mutex_init( &phyp_dev->ioctl_lock.s_message );
     spin_lock_init( &phyp_dev->ioctl_lock.s_tasklet );
-    spin_lock_init( &phyp_dev->ioctl_lock.s_generic );
-    spin_lock_init( &phyp_dev->ioctl_lock.s_request );
-    spin_lock_init( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_init( &phyp_dev->ioctl_lock.s_generic );
+    mutex_init( &phyp_dev->ioctl_lock.s_request );
+    mutex_init( &phyp_dev->ioctl_lock.s_digital_io );
     init_completion( &phyp_dev->message_received );
     phyp_dev->pdev = phyperion->pdev;
     phyp_dev->address_space_encoding = DMA_ADDRESS_SPACE_ENCODING_32BIT;
@@ -1062,10 +1062,9 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
                   unsigned long *processor_result )
 //-------------------------------------------------------------------------------------------
 {
-    unsigned long irqflags;
-    int           result = -ENODATA;
+    int result = -ENODATA;
     printk( KERN_ERR "transmit_message in atomic: %d\n", in_atomic() );
-    spin_lock_irqsave( &phyp_dev->ioctl_lock.s_message, irqflags );
+    mutex_lock( &phyp_dev->ioctl_lock.s_message );
     if( buffer != NULL && size > 0
         && size <= SIZE_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS )
     {
@@ -1099,7 +1098,7 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
         result = -ETIME;
     }
 
-    spin_unlock_irqrestore( &phyp_dev->ioctl_lock.s_message, irqflags );
+    mutex_unlock( &phyp_dev->ioctl_lock.s_message );
     return result;
 }
 

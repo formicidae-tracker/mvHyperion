@@ -4,7 +4,6 @@
 #include "device_queue.h"
 #include "hyperion_base.h"
 #include "hyperion_dma_nios.h"
-#include "ksemaphore.h"
 #include "linux/mutex.h"
 
 #define MAX_SGLIST_BUFFER_SIZE ( 512 * 1024 )
@@ -54,11 +53,11 @@ struct dma_sg_list
 typedef struct ioctl_lock
 //-------------------------------------------------------------------------------------------
 {
-    spinlock_t s_generic;
-    spinlock_t s_request;
-    spinlock_t s_digital_io;
-    spinlock_t s_message;
-    spinlock_t s_tasklet;
+    struct mutex s_generic;
+    struct mutex s_request;
+    struct mutex s_digital_io;
+    struct mutex s_message;
+    spinlock_t   s_tasklet;
 } t_ioctl_lock;
 
 //-------------------------------------------------------------------------------------------

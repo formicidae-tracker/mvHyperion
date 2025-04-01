@@ -14,7 +14,7 @@ case IOCTL_QUERY_CAPABILITIES:
 case IOCTL_QUERYINFO:
 {
     u32* info_to_query = IOBUFFER_TO( void* );
-    spin_lock( &phyp_dev->ioctl_lock.s_generic );
+    mutex_lock( &phyp_dev->ioctl_lock.s_generic );
     switch( *info_to_query )
     {
     case eqiEepromContent:
@@ -86,7 +86,7 @@ case IOCTL_QUERYINFO:
             break;
         }
     }
-    spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+    mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     break;
 }
 case IOCTL_BOOT_NIOS:
@@ -138,12 +138,12 @@ case IOCTL_CONFIG_IO_BIT:
     unsigned int message = MESSAGE_TYPE_METHOD | ( ID_METHOD_CONFIGURE_DIGITAL_OUTPUT & MESSAGE_INDEX_MSK );
     int result = 0;
     TPropertyElement32* list32;
-    spin_lock( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_lock( &phyp_dev->ioctl_lock.s_digital_io );
     list32 = ( TPropertyElement32* )kmalloc( mvio.in_size, GFP_KERNEL );
     translate_property_to_property32( IOBUFFER_TO( TPropertyElement* ), list32, ( mvio.in_size / sizeof( TPropertyElement ) ) );
     result = transmit_message( phyp_dev, message, 500, list32, mvio.in_size, NULL );
     kfree( list32 );
-    spin_unlock( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_unlock( &phyp_dev->ioctl_lock.s_digital_io );
     PRINTKM( IOCTL, ( PKTD " config_io_bit: transmit_message() --> result %d\n", phyperion->number, result ) );
     break;
 }
@@ -152,14 +152,14 @@ case IOCTL_WRITE_IO_BIT:
     u32 message = MESSAGE_TYPE_METHOD | ( ID_METHOD_WRITE_DIGITAL_OUTPUT & MESSAGE_INDEX_MSK );
     int result = 0;
     TPropertyElement32* list32, *pl32;
-    spin_lock( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_lock( &phyp_dev->ioctl_lock.s_digital_io );
     list32 = ( TPropertyElement32* )kmalloc( mvio.in_size, GFP_KERNEL );
     pl32 = list32;
     translate_property_to_property32( IOBUFFER_TO( TPropertyElement* ), list32, ( mvio.in_size / sizeof( TPropertyElement ) ) );
     list32 = pl32;
     result = transmit_message( phyp_dev, message, 500, /*IOBUFFER_TO(void*)*/ list32, mvio.in_size, NULL );
     kfree( pl32 );
-    spin_unlock( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_unlock( &phyp_dev->ioctl_lock.s_digital_io );
     PRINTKM( IOCTL, ( PKTD " write_io_bit: transmit_message() --> result %d\n", phyperion->number, result ) );
     break;
 }
@@ -171,7 +171,7 @@ case IOCTL_READ_DIGITAL_INPUT:
     unsigned long state;
     TPropertyElement* list, *pl;
     TPropertyElement32* list32, *pl32;
-    spin_lock( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_lock( &phyp_dev->ioctl_lock.s_digital_io );
     list = kmalloc( IO_READ_PROP_CNT * sizeof( TPropertyElement ), GFP_KERNEL );
     pl = list;
     list32 = kmalloc( IO_READ_PROP_CNT * sizeof( TPropertyElement ), GFP_KERNEL );
@@ -191,7 +191,7 @@ case IOCTL_READ_DIGITAL_INPUT:
     }
     kfree( list );
     kfree( list32 );
-    spin_unlock( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_unlock( &phyp_dev->ioctl_lock.s_digital_io );
     PRINTKM( IOCTL, ( PKTD " read_io_bit: transmit_message() --> result %d iobit_state %d\n", phyperion->number, result, ( int )state ) );
     break;
 }
@@ -207,13 +207,13 @@ case IOCTL_SPI_READ:
         unsigned long write_data = 0, read_data[data_len];
         int result;
         const int RW_EN = 1 << 15;
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         write_data = RW_EN | ( unsigned short )( ( IOBUFFER_TO( TSPIAccess* ) )->Offset );
         result = spi_command16( ( unsigned char* )( REG_POINTER( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhSPISimple, 0 ) ), ( IOBUFFER_TO( TSPIAccess* ) )->Slave, 1, ( unsigned short* )&write_data, 1, ( unsigned short* )read_data, 0/*ALT_AVALON_SPI_COMMAND_TOGGLE_SS_N*/ );
         ( IOBUFFER_TO( TRegisterAccess* ) )->Data = read_data[0];
         ( ( struct mv_ioctl* )io_buffer )->bytes_returned =  mvio.out_size;
         write_back_to_user = TRUE;
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     }
     break;
 }
@@ -226,14 +226,14 @@ case IOCTL_SPI_READ_LEN:
         int result;
         const int RW_EN = 1 << 15;
         const int AUTO_INC = 1 << 12;
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         offset = ( IOBUFFER_TO( TSPIAccess* ) )->Offset;
         slave = ( IOBUFFER_TO( TSPIAccess* ) )->Slave;
         write_data = RW_EN | AUTO_INC | offset;
         result = spi_command16( ( unsigned char* )( REG_POINTER( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhSPISimple, 0 ) ), slave, 1, ( unsigned short* )&write_data, mvio.out_size / sizeof( unsigned short ), IOBUFFER_TO( unsigned short* ), 0/*ALT_AVALON_SPI_COMMAND_TOGGLE_SS_N*/ );
         ( ( struct mv_ioctl* )io_buffer )->bytes_returned =  mvio.out_size;
         write_back_to_user = TRUE;
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     }
     break;
 }
@@ -243,10 +243,10 @@ case IOCTL_SPI_WRITE:
     {
         unsigned long write_data;
         int result;
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         write_data = ( unsigned short )( ( IOBUFFER_TO( TSPIAccess* ) )->Offset ) | ( short )( ( IOBUFFER_TO( TSPIAccess* ) )->Data ) << 16;
         result = spi_command16( ( unsigned char* )( REG_POINTER( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhSPISimple, 0 ) ), ( IOBUFFER_TO( TSPIAccess* ) )->Slave, 2, ( unsigned short* )&write_data, 0, NULL, 0/*ALT_AVALON_SPI_COMMAND_TOGGLE_SS_N*/ );
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     }
     break;
 }
@@ -254,12 +254,12 @@ case IOCTL_READ_REGISTER_U32:
 {
     if( mvio.in_size >= sizeof( TRegisterAccess ) )
     {
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         ( IOBUFFER_TO( TRegisterAccess* ) )->Data = ioread32( ( void __iomem* )( ( unsigned char* )phyp_dev->hyperion_base.base + ( IOBUFFER_TO( TRegisterAccess* ) )->Offset ) );
         //printk( "IOCTL_READ_REGISTER_U32 offset %lx data_read %lx\n", (IOBUFFER_TO(TRegisterAccess*))->Offset, (IOBUFFER_TO(TRegisterAccess*))->Data );
         ( ( struct mv_ioctl* )io_buffer )->bytes_returned =  mvio.out_size;
         write_back_to_user = TRUE;
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     }
     break;
 }
@@ -267,10 +267,10 @@ case IOCTL_WRITE_REGISTER_U32:
 {
     if( mvio.in_size >= sizeof( TRegisterAccess ) )
     {
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         iowrite32( ( IOBUFFER_TO( TRegisterAccess* ) )->Data, ( void __iomem* )( ( unsigned char* )phyp_dev->hyperion_base.base + ( IOBUFFER_TO( TRegisterAccess* ) )->Offset ) );
         //printk( "IOCTL_WRITE_REGISTER_U32 offset %lx data_read %lx\n", (IOBUFFER_TO(TRegisterAccess*))->Offset, (IOBUFFER_TO(TRegisterAccess*))->Data );
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     }
     break;
 }

@@ -42,11 +42,11 @@ case IOCTL_READ_EEPROM:
 {
     if( mvio.out_size <= EEPROM_SIZE )
     {
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         I2CReceiveData( ( unsigned int* )REG_POINTER( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhI2CRead, 0 ), EEPROM_ADDR, 0, mvio.out_size, IOBUFFER_TO( unsigned char* ) );
         ( ( struct mv_ioctl* )io_buffer )->bytes_returned = mvio.out_size;
         write_back_to_user = TRUE;
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     }
     break;
 }
@@ -57,13 +57,13 @@ case IOCTL_WRITE_EEPROM:
         int i;
         unsigned char* eepromdata = IOBUFFER_TO( unsigned char* );
         PRINTKM( IOCTL, ( PKTD " %s, write_eeprom in_size %d\n", phyperion->number, __FUNCTION__, mvio.in_size ) );
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         for( i = 0; i < mvio.in_size; i++ )
         {
             I2CSendData( ( unsigned int* )REG_POINTER( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhI2CRead, 0 ), EEPROM_ADDR, i, 1, &eepromdata[i] );
         }
         phyp_dev->eeprom_write_access = -1;
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     }
     break;
 }
@@ -81,11 +81,11 @@ case IOCTL_WRITE_MUX_DATA:
 {
     if( mvio.in_size <= MUX_CONTROLLER_SEQUENCE_SIZE_BYTES )
     {
-        spin_lock( &phyp_dev->ioctl_lock.s_request );
+        mutex_lock( &phyp_dev->ioctl_lock.s_request );
         phyp_dev->mux_seq.changed = TRUE;
         phyp_dev->mux_seq.size = mvio.in_size;
         memcpy( ( void* )phyp_dev->mux_seq.muxdata, IOBUFFER_TO( void* ), mvio.in_size );
-        spin_unlock( &phyp_dev->ioctl_lock.s_request );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_request );
     }
     break;
 }
@@ -94,11 +94,11 @@ case IOCTL_READ_ASMI_U32:
     if( mvio.in_size >= sizeof( TRegisterAccess ) )
     {
         TRegisterAccess* regacc = IOBUFFER_TO( TRegisterAccess* );
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         regacc->Data = ( unsigned long )IO_READ_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhAsmiInterface, regacc->Offset );
         ( ( struct mv_ioctl* )io_buffer )->bytes_returned = mvio.in_size;
         write_back_to_user = TRUE;
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
         //PRINTKM (IOCTL,(PKTD " IOCTL_READ_ASMI_U32 pasmi %p data read %x\n", phyperion->number, pasmi_reg, regacc->Data ));
     }
     break;
@@ -108,9 +108,9 @@ case IOCTL_WRITE_ASMI_U32:
     if( mvio.in_size >= sizeof( TRegisterAccess ) )
     {
         TRegisterAccess* regacc = IOBUFFER_TO( TRegisterAccess* );
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhAsmiInterface, regacc->Offset, regacc->Data );
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
         //PRINTKM (IOCTL,(PKTD " IOCTL_WRITE_ASMI_U32 pasmi %p data %x\n", phyperion->number, pasmi_reg, regacc->Data ));
     }
     break;
@@ -121,7 +121,7 @@ case IOCTL_WRITE_HRTC:
     u32 i, property_count = 0, hrtc_index = 0, hrtc_control = 0;
     unsigned char changed = FALSE;
 
-    spin_lock( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_lock( &phyp_dev->ioctl_lock.s_digital_io );
     property_count = mvio.in_size / sizeof( TPropertyElement );
     prop_element = IOBUFFER_TO( TPropertyElement* );
     _READ_PROPERTYI( prop_element, property_count, prHRTCIndex, hrtc_index, changed );
@@ -139,7 +139,7 @@ case IOCTL_WRITE_HRTC:
         }
     }
     IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhHrtController0 + hrtc_index, OFF_HRT_CONTROLLER_CTRL, hrtc_control );
-    spin_unlock( &phyp_dev->ioctl_lock.s_digital_io );
+    mutex_unlock( &phyp_dev->ioctl_lock.s_digital_io );
     wmb();
     break;
 }
@@ -150,9 +150,9 @@ case IOCTL_WRITE_HRTC_U32:
         TRegisterAccess* regacc = IOBUFFER_TO( TRegisterAccess* );
         //unsigned long *phrtc_reg = (unsigned long*)(phyperion->hyperion_register.base + regacc->Offset);
         //*phrtc_reg = regacc->Data;
-        spin_lock( &phyp_dev->ioctl_lock.s_digital_io );
+        mutex_lock( &phyp_dev->ioctl_lock.s_digital_io );
         iowrite32( regacc->Data, ( void* )( phyp_dev->hyperion_base.base + regacc->Offset ) );
-        spin_unlock( &phyp_dev->ioctl_lock.s_digital_io );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_digital_io );
     }
     break;
 }
@@ -163,7 +163,7 @@ case IOCTL_UNMAP_SG_LIST:
     if( mvio.in_size >= sizeof( TUserBuffer ) )
     {
         TUserBuffer* ubuf = IOBUFFER_TO( TUserBuffer* );
-        spin_lock( &phyp_dev->ioctl_lock.s_request );
+        mutex_lock( &phyp_dev->ioctl_lock.s_request );
         if( ubuf->buffer == NULL )
         {
             free_all_user_buffer_descriptors( phyperion );
@@ -172,7 +172,7 @@ case IOCTL_UNMAP_SG_LIST:
         {
             free_user_buffer_descriptor( phyperion, ubuf->buffer, ubuf->count );
         }
-        spin_unlock( &phyp_dev->ioctl_lock.s_request );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_request );
     }
 #endif
     break;
@@ -182,9 +182,9 @@ case IOCTL_POWER_OVER_CL:
     if( mvio.in_size >= sizeof( TRegisterAccess ) )
     {
         TRegisterAccess* regacc = IOBUFFER_TO( TRegisterAccess* );
-        spin_lock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_lock( &phyp_dev->ioctl_lock.s_generic );
         hyperion_camera_power( phyperion, regacc->Data );
-        spin_unlock( &phyp_dev->ioctl_lock.s_generic );
+        mutex_unlock( &phyp_dev->ioctl_lock.s_generic );
     }
     break;
 }
