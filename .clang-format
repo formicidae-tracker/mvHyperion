@@ -5,4 +5,5 @@ IndentWidth: 4
 SpacesInParentheses: true
 BreakBeforeBraces: Allman
 SpaceBeforeParens: false
+AlignConsecutiveDeclarations: Consecutive
 ---

@@ -94,7 +94,6 @@ case IOCTL_BOOT_NIOS:
     if( mvio.in_size <= NIOS_MEMORY_APP_SIZE )
     {
         int proc_status = -1;
-        reset_sema( phyp_dev->sema_message_received );
         proc_status = hyperion_boot_processor( phyp_dev, IOBUFFER_TO( void* ), mvio.in_size );
         phyp_dev->processor_app_size = mvio.in_size;
         phyp_dev->processor_status = proc_status;

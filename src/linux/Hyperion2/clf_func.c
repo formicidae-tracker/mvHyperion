@@ -328,15 +328,15 @@ void
 hyperion_do_tasklet( unsigned long index )
 //-------------------------------------------------------------------------------------------
 {
-    struct hyperion *phyperion = get_hyperion( index );
+    struct hyperion        *phyperion = get_hyperion( index );
     struct hyperion_device *phyp_dev
         = (struct hyperion_device *)phyperion->device;
     struct hyperion_request_packet *phyperion_request_packet = NULL;
-    TItem isr_result;
-    message_item msg_it;
-    unsigned char read_ok;
-    u32 dto_index;
-    unsigned long irqflags;
+    TItem                           isr_result;
+    message_item                    msg_it;
+    unsigned char                   read_ok;
+    u32                             dto_index;
+    unsigned long                   irqflags;
     msg_it.message = 0;
 
     do
@@ -351,7 +351,7 @@ hyperion_do_tasklet( unsigned long index )
         // isr_result.status );
         if( isr_result.status & A2P_MAILBOX_INT0 )
         {
-            signal_sema( phyp_dev->sema_message_received, 1 );
+            complete( &phyp_dev->message_received );
         }
 
         if( isr_result.status & A2P_MAILBOX_INT1 )
@@ -793,8 +793,8 @@ int
 hyperion_func_init( struct hyperion *phyperion, unsigned long control )
 //-------------------------------------------------------------------------------------------
 {
-    int i, result = 0;
-    u32 system_ctrl_reg;
+    int                     i, result = 0;
+    u32                     system_ctrl_reg;
     struct hyperion_device *phyp_dev
         = kmalloc( sizeof( struct hyperion_device ), GFP_KERNEL );
 
@@ -811,7 +811,7 @@ hyperion_func_init( struct hyperion *phyperion, unsigned long control )
     spin_lock_init( &phyp_dev->ioctl_lock.s_generic );
     spin_lock_init( &phyp_dev->ioctl_lock.s_request );
     spin_lock_init( &phyp_dev->ioctl_lock.s_digital_io );
-    phyp_dev->sema_message_received = create_sema( 0, 1 );
+    init_completion( &phyp_dev->message_received );
     phyp_dev->pdev = phyperion->pdev;
     phyp_dev->address_space_encoding = DMA_ADDRESS_SPACE_ENCODING_32BIT;
     if( !dma_set_mask( &phyperion->pdev->dev, DMA_BIT_MASK( 64 ) ) )
@@ -1063,7 +1063,7 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
 //-------------------------------------------------------------------------------------------
 {
     unsigned long irqflags;
-    int wait, result = -ENODATA;
+    int           result = -ENODATA;
     printk( KERN_ERR "transmit_message in atomic: %d\n", in_atomic() );
     spin_lock_irqsave( &phyp_dev->ioctl_lock.s_message, irqflags );
     if( buffer != NULL && size > 0
@@ -1074,38 +1074,14 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
                           + OFF_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS ),
                 buffer, size );
     }
-    reset_sema( phyp_dev->sema_message_received );
+    reinit_completion( &phyp_dev->message_received );
     IO_WRITE_32( phyp_dev->hyperion_base, phyp_dev->reg_def, ebrhPCICore,
                  OFF_P2A_MAILBOX0, message );
 
-    wait = msecs_to_jiffies( timeout_msec );
-    bool once = false;
-    printk( KERN_ERR "now transmit_message in atomic: %d\n", in_atomic() );
-    while( wait > 0 )
-    {
-        if( in_atomic() )
-        {
-            if( once == true )
-            {
-                once = false;
-                printk(
-                    KERN_ERR
-                    "WUT what did you just do, scheduling in an atomic???\n" );
-                dump_stack();
-            }
-        }
-        else
-        {
-            wait_jiffies( 1 );
-        }
-        result = wait_sema( phyp_dev->sema_message_received, 2 );
-        if( result == ObjSignaled )
-        {
-            break;
-        }
-        --wait;
-    }
-    if( result == ObjSignaled )
+    result = wait_for_completion_io_timeout(
+        &phyp_dev->message_received, msecs_to_jiffies( timeout_msec ) );
+
+    if( result > 0 ) // no timeout
     {
         if( processor_result != NULL )
         {
@@ -1118,7 +1094,7 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
             result = 0;
         }
     }
-    else
+    else // have a timeout or an error
     {
         result = -ETIME;
     }
