@@ -1063,7 +1063,6 @@ transmit_message( struct hyperion_device *phyp_dev, unsigned int message,
 //-------------------------------------------------------------------------------------------
 {
     int result = -ENODATA;
-    printk( KERN_ERR "transmit_message in atomic: %d\n", in_atomic() );
     mutex_lock( &phyp_dev->ioctl_lock.s_message );
     if( buffer != NULL && size > 0
         && size <= SIZE_ONCHIP_MEM_DATA_SHARED_BUFFER_NIOS )
